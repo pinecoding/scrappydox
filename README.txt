@@ -1,0 +1,233 @@
+NAME
+    scrappydox - Preprocessor for building documents from markdown files
+
+SYNOPSIS
+    scrappydox [ROOT FILE] [OTHER FILES]...
+
+DESCRIPTION
+    Scrappydox builds a markdown document out of multiple markdown files,
+    starting from [ROOT FILE] as the main, top-level, section.
+
+    [OTHER FILES] are handled in two different ways:
+
+    -   If a filename does not contain caret path-separator characters, then
+        it is added as a subsection of [ROOT FILE], in the order
+        encountered.
+
+    -   If a filename contains caret path-separator characters, then
+        scrappydox will attempt to match its path to other paths to find its
+        appropriate place in the hierarchy of sections in the document.
+
+    As an example of path matching, consider the following list of files
+    passed to scrappydox:
+
+        Mission_Trails.txt Geology.txt Botany.txt Botany^Plant_Communities.txt Botany^Plant_List.txt
+
+    Scrappydox will match paths to create a document with the following
+    section hierarchy:
+
+        Mission Trails
+            Geology
+            Botany
+                Plant Communities
+                Plant List
+
+    Section headers and the overall title are taken from the filename (minus
+    the path), or, if present, from the first line of the file, if it is a
+    Markdown header line. Scrappydox assumes Markdown atx-style headers
+    without closing hash characters. Scrappydox adjusts headers as
+    appropriate to the nesting level within the overall document being
+    created.
+
+    Optional head and tail components can be added to filenames to enforce
+    sorting or provide extra information. Both are stripped away and
+    ignored. Everything before and including the last plus-sign character,
+    and everything after and including the first tilde character, are
+    ignored. Here is an example of a filename with both a head and tail:
+
+        01+Geology~Mission_Trails.txt
+
+    An HTML comment block at the top of the docment, or after the title line
+    (first line) can be used to specify commands for loading additional
+    files, and for the definition of user variables used for sorting and
+    filtering of the files loaded. Following is an example of a root
+    document specifying the remainder of the document, so that [OTHER FILES]
+    are not needed:
+
+        # Mission Trails
+        <!--
+        * Choose: Field eq Botany
+        * Choose: Field eq Geology
+        * Choose: Field eq Zoology
+        * Exclude: Field eq Anthropology
+        * Child: Announcements.txt
+        * Load: Announcements^*.txt
+        * Child: Stories.txt
+        * Load: ../_Stories/Stories^*.txt
+            - Sort: ascending alpha using field
+            - Sort: ascending alpha on name
+        * Child: Glossary.txt
+        * Load from Refs: path Glossary using ../_Glossary/Glossary^*.txt
+        * Child: References.txt
+        * Load from Refs: no path using ../_References/References^*.txt
+        + Author: Sam Gabriel
+        -->
+
+        **Authored By:** <+Author+>  
+        **Document Date:** <*Date*>
+
+    The HTML comment begin and end indicators must be flush left, and each
+    on its own line, as shown. Commands are prefixed by asterisk bullets,
+    user-defined properties are prefixed by plus-sign bullets.
+
+    Each "Child" command loads a file as a child section, or files as child
+    sections (if wildcards are used). Each "Load" command loads files for
+    path matching, where each file must have a path that matches a filename
+    in the document in order to be included as a subsection under the
+    matched filename.
+
+    "Child" and "Load" commands can include sort modifiers as subbullets
+    that begin with dashes. Two are in the example above:
+
+            - Sort: ascending alpha using field
+            - Sort: ascending alpha on name
+
+    The first (primary) sort line sorts ascending alphabetically using the
+    user-defined property called "field". The second (secondary) sort line
+    sorts ascending (descending is the alternate option) alphabetically
+    (numeric is the alternate option to alpha) on the system-defined
+    (built-in) value "name", which is the filename without the path ("title"
+    is another system-defined value).
+
+    Sort can be a command on its own, in which case it applies to the
+    children of the file, after the document tree has been constructed in
+    memory. The "Reference.txt" file sorts its children by name:
+
+        #
+        <!--
+        * Sort: ascending alpha on name
+        -->
+
+    This file also illustrates the use of a blank line beginning with the
+    Markdown header indicator (number sign), to indicate that the
+    system-defined "name" field should be used for the section title (with
+    underscores replaced by spaces, as necessary). In this case, the section
+    title will be "References".
+
+    The header for one of the "Stories" files illustrates how the
+    user-defined property "Field" is defined:
+
+        # 
+        <!--
+        + Field: Geology
+        -->
+
+    The "Choose" and "Exclude" commands operate on user-defined properties.
+    "Choose" only loads a file if the property it references ("field" in
+    this case) is not defined for the file, or the logical statement
+    referencing the property is true for some setting of the property in the
+    file (each property can have multiple settings). "Exclude" causes a file
+    to not be loaded if the property it references is defined for the file,
+    and the logical statement referencing the property is true for some
+    setting of the property in the file. Logical statements use Perl's
+    string and numeric operators.
+
+    There are two forms of the "Load from Refs" command, and both are
+    illustrated in the example above.
+
+        * Load from Refs: path Glossary using ../_Glossary/Glossary^*.txt
+        * Load from Refs: no path using ../_References/References^*.txt
+
+    The first matches the specified path ("Glossary" in this case) to the
+    path in each shorthand link statement encountered (see below for a
+    description of shorthand link statements), and if it finds a match, it
+    tries to load a file using the filename specification at the end of the
+    statement. The filename specification must contain a asterisk character:
+    the asterisk is replaced by the name (non-path part) of the link.
+    Following is an example of a link with a path:
+
+        <#Glossary^Bajada#>
+
+    In the example above, this link maps to the following filename:
+
+        ../_Glossary/Glossary^Bajada.txt
+
+    The second form is the same as the first, except that it is for links
+    that do not have a path. For example, the following link to a reference
+    has no path:
+
+        <#Leitner 2011 SDCNP#>
+
+    In the example above, this link maps to the following filename:
+
+        ../_References/References^Leitner_2011_SDCNP.txt
+
+    In addition to document construction capabilities, scrappydox supports
+    the following shorthand notations:
+
+    <"name">            Defines an HTML anchor with ID and title both set to
+                        "name".
+
+    <"^name">           Defines an HTML anchor with title "name" and ID set
+                        to the full path of the current file within the
+                        document, with "^name" appended.
+
+    <"prefix+name">     Defines an HTML anchor title set to "name" and ID
+                        set to "prefix+name". "prefix+" provides a namespace
+                        independent of the path hierarchy, as the path
+                        hierarchy does not contain plus signs.
+
+    <#link#>            Defines a link to any of the anchor-types defined
+                        above. The link will be the same as the anchor it
+                        links to, and follows the same rules for what will
+                        be displayed as the title of the link.
+
+    <*property*>        Is replaced by the named system-defined property.
+                        "Date" is the only system-defined property currently
+                        supported.
+
+    <+property+>        Is replaced by the named user-defined property.
+
+    <{r}text{r}>        Colors the enclosed text red.
+
+    <{g}text{g}>        Colors the enclosed text green.
+
+    <{b}text{b}>        Colors the enclosed text blue.
+
+    <{P}text{P}>        Sets the background of the enclosed text to pink.
+
+    <{Y}text{Y}>        Sets the background of the enclosed text to yellow.
+
+    <{B}text{B}>        Sets the background of the enclosed text to blue.
+
+    <{-}text{-}>        Sets the enclosed text to strikethrough font.
+
+    Shorthand translation can be turned off for a file by setting the system
+    property "process shorthand" to "0" in that file:
+
+        <!--
+        * Process Shorhand: 0
+        -->
+
+LICENSE
+    Copyright (c) 2015 Sam Gabriel
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the
+    "Software"), to deal in the Software without restriction, including
+    without limitation the rights to use, copy, modify, merge, publish,
+    distribute, sublicense, and/or sell copies of the Software, and to
+    permit persons to whom the Software is furnished to do so, subject to
+    the following conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+    OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+    IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+    CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+    TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
