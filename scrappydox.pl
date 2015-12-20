@@ -462,8 +462,7 @@ sub connectFile
     # Process syscmds for filters, and to load children and other files in order
     my @children;
     # Root filters apply to all subsequent files loaded in the same list with root:
-    my $filters = $isRoot ? $parentFilters : {};
-    @$filters{keys %{$parentFilters}} = values %{$parentFilters};
+    my $filters = $isRoot ? $parentFilters : {%$parentFilters};
     foreach my $syscmd (@{$syscmds}) {
         my $cmd = $$syscmd{cmd};
         my $arg = $$syscmd{arg};
