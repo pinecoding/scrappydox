@@ -181,9 +181,13 @@ Sets the enclosed text to strikethrough font.
 Shorthand translation can be turned off for a file by setting the system property "process shorthand" to "0" in that file:
 
     <!--
-    * Process Shorhand: 0
+    * Process Shorthand: 0
     -->
     
+=head1 CAVEATS
+
+The "Load from Refs" command works best when the file system is case insensitive as it is by default on Windows and Mac OS X. Otherwise, the refs will have to match case with the filename for the file to load; not great for glossary entries where the case of the ref should match the context of the ref.
+
 
 =head1 LICENSE
 
