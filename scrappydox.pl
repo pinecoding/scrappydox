@@ -315,7 +315,7 @@ sub loadFile
     # Obtain information from first line of file
     if (defined($_ = <$fh>)) {
         if (!readProperties(\@syscmds, \%sysvars, \%uservars, $fh, $_)) {
-            ($prefix, $title) = /^(#*)\s*(.*?)\s*$/;
+            ($prefix, $title) = /^(#+)\s*(.*?)\s*$/;
 
             # Check second line of file for properties section
             if (defined($_ = <$fh>)) {
