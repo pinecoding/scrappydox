@@ -488,7 +488,7 @@ sub connectFile
                 push @files, $file if defined $file;
             }
             foreach my $switch (reverse @{$switches}) {
-                if ($switch =~ /^sort\s+reverse$/i) {
+                if ($switch =~ /^sort\s*:\s+reverse$/i) {
                     @files = reverse @files;
                 }
                 elsif ($switch =~ /^sort\s*:\s+(ascending|descending)\s+(alpha|numeric)\s+(on|using)\s+(.+)$/i) {
