@@ -124,6 +124,10 @@ In addition to document construction capabilities, scrappydox supports the follo
 
 =over 20
 
+=item <@filename@>
+
+Inserts the contents of file "filename" after parsing it for other shorthand notations. Useful for template text containing variable references.
+
 =item <"name">
 
 Defines an HTML anchor with ID and title both set to "name".
@@ -142,7 +146,7 @@ Defines a link to any of the anchor-types defined above. The link will be the sa
 
 =item <*property*>
 
-Is replaced by the named system-defined property. "Date" is the only system-defined property currently supported.
+Is replaced by the named system-defined property. "Date" and "Name" are the only system-defined properties currently supported. "Name" is the portion of the filename after the caret-separated the path.
 
 =item <+property+>
 
@@ -820,7 +824,7 @@ sub procShorthand
 {
     my $file = shift;
     my $bodyref = shift;
-    $$bodyref =~ s/<(["#*+]|\{[rgbPYB-]\})(.+?)\1>/proc($file, $1, $2)/eg;
+    $$bodyref =~ s/<([@"#*+]|\{[rgbPYB-]\})(.+?)\1>/proc($file, $1, $2)/eg;
 }
 
 sub procVarShorthand
@@ -835,6 +839,19 @@ sub proc
     my $file = shift;
     my $char = shift;
     my $body = shift;
+    if ($char eq '@') { # File to include
+        open (my $fh, '<', $body) or die "Can't open $body: $!";
+        if (defined $fh) {
+            my $includedOutput;
+            while (my $line = <$fh>) {
+                procShorthand($file, \$line);
+                $includedOutput .= $line;
+            }
+            close $fh;
+            return $includedOutput;
+        }
+        return '';
+    }
     if ($char eq '"') { # Anchor
         my $display;
         my $url;
@@ -925,6 +942,9 @@ sub proc
         my $sysvarname = lc $body;
         if ($sysvarname eq 'date') {
             return $currDate;
+        }
+        if ($sysvarname eq 'name') {
+            return $$file{name};
         }
     }
     elsif ($char eq '+') { # User variable

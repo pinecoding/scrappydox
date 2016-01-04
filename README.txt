@@ -165,6 +165,10 @@ DESCRIPTION
     In addition to document construction capabilities, scrappydox supports
     the following shorthand notations:
 
+    <@filename@>        Inserts the contents of file "filename" after
+                        parsing it for other shorthand notations. Useful for
+                        template text containing variable references.
+
     <"name">            Defines an HTML anchor with ID and title both set to
                         "name".
 
@@ -183,8 +187,10 @@ DESCRIPTION
                         be displayed as the title of the link.
 
     <*property*>        Is replaced by the named system-defined property.
-                        "Date" is the only system-defined property currently
-                        supported.
+                        "Date" and "Name" are the only system-defined
+                        properties currently supported. "Name" is the
+                        portion of the filename after the caret-separated
+                        the path.
 
     <+property+>        Is replaced by the named user-defined property.
 
