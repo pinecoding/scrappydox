@@ -953,8 +953,12 @@ sub proc
         if (exists $$uservars{$uservarname}) {
             return @{$$uservars{$uservarname}}[-1];
         }
+        # Unrecognized user variable: silently return empty string.
+        # Returning empty string supports notion that user variables
+        # are optional.
+        return '';
     }
-    # Unrecognized, just return original string
+    # Unrecognized shorthand: return original string
     return "<$char$body$char>";
 }
 
