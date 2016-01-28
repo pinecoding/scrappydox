@@ -222,6 +222,13 @@ CAVEATS
     great for glossary entries where the case of the ref should match the
     context of the ref.
 
+    To make "Load from Refs" work for all characters, characters in refs
+    that are not allowed in filenames ('\', '/', ':', '*', '?', '"', '<',
+    '>', '|') are URL-encoded; e.g. ':' becomes '%3a'. This means that the
+    filenames must contain the URL-encoded characters. Filenames are
+    URL-decoded before they are used to create user-display information,
+    such as titles.
+
 LICENSE
     Copyright (c) 2015 Sam Gabriel
 

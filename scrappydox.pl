@@ -192,6 +192,8 @@ Shorthand translation can be turned off for a file by setting the system propert
 
 The "Load from Refs" command works best when the file system is case insensitive as it is by default on Windows and Mac OS X. Otherwise, the refs will have to match case with the filename for the file to load; not great for glossary entries where the case of the ref should match the context of the ref.
 
+To make "Load from Refs" work for all characters, characters in refs that are not allowed in filenames ('\', '/', ':', '*', '?', '"', '<', '>', '|') are URL-encoded; e.g. ':' becomes '%3a'. This means that the filenames must contain the URL-encoded characters. Filenames are URL-decoded before they are used to create user-display information, such as titles.
+
 
 =head1 LICENSE
 
@@ -328,7 +330,7 @@ sub loadFile
         }
     }
     $prefix = $prefix ? $prefix : "";  
-    $title = $title ? $title : $name =~ s/$ss/ /gr;
+    $title = $title ? $title : titleFromName($name);
     
     # Set up loadFromRefs
     my $loadFromRefs = $isRoot ? $parentLoadFromRefs : {%$parentLoadFromRefs};
@@ -347,14 +349,20 @@ sub loadFile
     my @refdFilesToLoad;
     if (keys %$loadFromRefs) {
         while (<$fh>) {
-            while (/<#([^#+]+$psr)?([^#+$psr]+)#>/g) {
+            # $psr causes problems in the following regular expression:
+            # source strings containing a colon in the $2 position end up
+            # not matching the regular expression
+            #while (/<#([^#+]+$psr)?([^#+$psr]+)#>/g) {
+            while (/<#([^#+]+\^)?([^#+^]+)#>/g) {
                 my $path = !defined $1 ? '' : $1;
-                my $filename = $2;
                 chop $path;
-                $filename =~ s/ /$ss/g;
+                my $name = nameFromTitle($2);
+                #print STDERR "Name to load: $name\n";
                 if (exists $$loadFromRefs{$path}) {
                     my $template = $$loadFromRefs{$path};
-                    push @refdFilesToLoad, $template =~ s/\*/$filename/r;
+                    my $refFileName = $template =~ s/\*/$name/r;
+                    push @refdFilesToLoad, $refFileName;
+                    #print STDERR "Ref to load: $refFileName\n";
                 }
             }
         }
@@ -859,13 +867,13 @@ sub proc
             # Anchor is the file anchor (based on ID)
             my $name = $$file{name};
             $url = $$file{anchor};
-            $display = $name =~ s/$ss/ /gr;
+            $display = titleFromName($name);
         }
         elsif ($body eq $ni) {
             # Anchor is name
             my $name = $$file{name};
             $url = an($name);
-            $display = $name =~ s/$ss/ /gr;
+            $display = titleFromName($name);
         }
         else {
             # Anchor is a regular path
@@ -960,12 +968,6 @@ sub proc
     }
     # Unrecognized shorthand: return original string
     return "<$char$body$char>";
-}
-
-sub an
-{
-    my $anchor = shift;
-    return (lc $anchor) =~ s/ /$ss/gr;
 }
 
 sub addToHash
@@ -1075,4 +1077,55 @@ sub dateString
     if ($type eq "Datime") { return $datime };
     return $datime;
 }
+
+sub urlDecode
+{
+    # Performs standard URL decoding, where encoding is indicated by percent signs.
+    my $url = shift;
+    $url =~ s/%([A-Fa-f\d]{2})/ chr hex $1 /eg;
+    return $url;
+}
+
+sub an
+{
+    # Special characters need to be encoded for anchors. As anchors
+    # appear both in id tag attributes and in URLs, URL-style
+    # encoding does not work properly. Instead, URL-style encoding
+    # is modified to use period instead of percent. Period is a good
+    # choice because it is not a special character in URLs, and it is
+    # allowable in HTML4 ID attributes. Periods themselves are encoded.
+    #
+    # The name (not path) portion of the input to this subroutine may use
+    # URL encoding, so URL decoding is performed on the name first.
+    my $anchor = shift;
+    $anchor =~ s/([^$psr]+)$/ urlDecode($1) /e;
+    $anchor =~ s/ /$ss/g; # substitute spaces
+    $anchor =~ s/([:;,.!?%@&#*=~\$'"\\\/()<>{}[\]])/ sprintf ".%02x", ord $1 /eg;
+    return (lc $anchor);
+}
+
+sub titleFromName
+{
+    # The name portion of filenames can use standard URL encoding.
+    # The algorithm here applys that standard URL decoding, plus
+    # translation of underscores to spaces.
+    my $title = shift;
+    $title =~ s/$ss/ /g;
+    return urlDecode($title);
+}
+
+sub nameFromTitle
+{
+    # "Name" refers to the non-path (right-most) portion of a scrappydox filename,
+    # where the path is the scrappydox path, separated by caret characters. This
+    # routine encodes characters that are illegal in Windows filenames. Illegal Windows
+    # filename characters are `\/:*?"<>|`. These characters are URL-encoded, and spaces
+    # are translated to underscores. Windows is more restrictive than Mac OS X,
+    # so its list of invalid characters was used for this translation.
+    my $filename = shift;
+    $filename =~ s/ /$ss/g;
+    $filename =~ s/([\\\/:*?"<>|])/ sprintf "%%%02x", ord $1 /eg;
+    return $filename;
+}
+
 
