@@ -140,6 +140,10 @@ Defines an HTML anchor with title "name" and ID set to the full path of the curr
 
 Defines an HTML anchor title set to "name" and ID set to "prefix+name". "prefix+" provides a namespace independent of the path hierarchy, as the path hierarchy does not contain plus signs.
 
+=item <'anchor'>
+
+Same as the double-quote HTML anchor notations above, except that no title is displayed.
+
 =item <#link#>
 
 Defines a link to any of the anchor-types defined above. The link will be the same as the anchor it links to, and follows the same rules for what will be displayed as the title of the link.
@@ -832,7 +836,7 @@ sub procShorthand
 {
     my $file = shift;
     my $bodyref = shift;
-    $$bodyref =~ s/<([@"#*+]|\{[rgbPYB-]\})(.+?)\1>/proc($file, $1, $2)/eg;
+    $$bodyref =~ s/<([@"'#*+]|\{[rgbPYB-]\})(.+?)\1>/proc($file, $1, $2)/eg;
 }
 
 sub procVarShorthand
@@ -860,7 +864,7 @@ sub proc
         }
         return '';
     }
-    if ($char eq '"') { # Anchor
+    if ($char eq '"' or $char eq "'") { # Anchor
         my $display;
         my $url;
         if ($body eq $ii) {
@@ -891,6 +895,7 @@ sub proc
                 $url = an($body);
             }
         }
+        $display = '' if $char eq "'";
         return "<span id=\"$url\">$display<\/span>";
     }
     if ($char eq '#') { # Link

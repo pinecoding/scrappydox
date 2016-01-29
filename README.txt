@@ -181,6 +181,9 @@ DESCRIPTION
                         independent of the path hierarchy, as the path
                         hierarchy does not contain plus signs.
 
+    <'anchor'>          Same as the double-quote HTML anchor notations
+                        above, except that no title is displayed.
+
     <#link#>            Defines a link to any of the anchor-types defined
                         above. The link will be the same as the anchor it
                         links to, and follows the same rules for what will
