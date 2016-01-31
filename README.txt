@@ -162,6 +162,51 @@ DESCRIPTION
 
         ../_References/References^Leitner_2011_SDCNP.txt
 
+    Refs can also be loaded from anchor blocks within a file. For example, a
+    file Glossary~Complete.txt might contain anchor blocks for glossary
+    entries like the following:
+
+        <'Glossary^-A-'>
+        **<"Glossary^Alluvial Fan">** "is a fan- or cone-shaped deposit
+        of sediment crossed and built up by streams" 
+        (<http://www.wikipedia.org/wiki/Bajada_(geography)>).
+
+        <'Glossary^-B-'>
+        **<"Glossary^Bajada">** "consists of a series of coalescing
+        <#Glossary^alluvial fan#>s along a mountain front" 
+        (<http://www.wikipedia.org/wiki/Alluvial_fan>).
+
+    An anchor block starts with a line containing a visible anchor. In the
+    example above, the first visible anchor is:
+
+        <"Glossary^Alluvial Fan">
+
+    The anchor block ends before the next line containing a visible or
+    invisible anchor. In the example above, the first anchor block ends
+    before the line with the following invisible anchor:
+
+        <'Glossary^-B-'>
+
+    To make anchor blocks available for "Load from Refs" commands, the file
+    containing them must appear in a "Split for Refs" command. The command
+    for the Glossary~Complete.txt file, along with an appropriate "Load from
+    Refs" command, is:
+
+        * Split for Refs: Glossary~Complete.txt
+        * Load from Refs: path Glossary using Glossary^*
+
+    Note that the file specification in the "Load from Refs" command does
+    not contain an extension. That is because the anchor blocks pulled out
+    of the file in the "Split for Refs" command are turned into pseudo-files
+    with a filename that is just a file-appropriate version of the anchor
+    name. For example, the anchor block for anchor
+
+        <"Glossary^Alluvial Fan">
+
+    is given the case-insensitive filename
+
+        glossary^alluvial_fan
+
     In addition to document construction capabilities, scrappydox supports
     the following shorthand notations:
 
@@ -231,6 +276,11 @@ CAVEATS
     filenames must contain the URL-encoded characters. Filenames are
     URL-decoded before they are used to create user-display information,
     such as titles.
+
+    Both the need for a case insensitive operating system and the need to
+    URL-encode special characters in filenames can be avoided by using the
+    "Split for Refs" command to make reference targets available from anchor
+    blocks within a file.
 
 LICENSE
     Copyright (c) 2015 Sam Gabriel

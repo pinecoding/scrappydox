@@ -120,6 +120,39 @@ In the example above, this link maps to the following filename:
 
     ../_References/References^Leitner_2011_SDCNP.txt   
 
+Refs can also be loaded from anchor blocks within a file. For example, a file Glossary~Complete.txt might contain anchor blocks for glossary entries like the following:
+
+    <'Glossary^-A-'>
+    **<"Glossary^Alluvial Fan">** "is a fan- or cone-shaped deposit
+    of sediment crossed and built up by streams" 
+    (<http://www.wikipedia.org/wiki/Bajada_(geography)>).
+
+    <'Glossary^-B-'>
+    **<"Glossary^Bajada">** "consists of a series of coalescing
+    <#Glossary^alluvial fan#>s along a mountain front" 
+    (<http://www.wikipedia.org/wiki/Alluvial_fan>).
+
+An anchor block starts with a line containing a visible anchor. In the example above, the first visible anchor is:
+
+    <"Glossary^Alluvial Fan">
+    
+The anchor block ends before the next line containing a visible or invisible anchor. In the example above, the first anchor block ends before the line with the following invisible anchor:
+
+    <'Glossary^-B-'>
+
+To make anchor blocks available for "Load from Refs" commands, the file containing them must appear in a "Split for Refs" command. The command for the Glossary~Complete.txt file, along with an appropriate "Load from Refs" command, is:
+
+    * Split for Refs: Glossary~Complete.txt
+    * Load from Refs: path Glossary using Glossary^*
+
+Note that the file specification in the "Load from Refs" command does not contain an extension. That is because the anchor blocks pulled out of the file in the "Split for Refs" command are turned into pseudo-files with a filename that is just a file-appropriate version of the anchor name. For example, the anchor block for anchor
+
+    <"Glossary^Alluvial Fan">
+    
+is given the case-insensitive filename
+
+    glossary^alluvial_fan
+    
 In addition to document construction capabilities, scrappydox supports the following shorthand notations:
 
 =over 20
@@ -198,6 +231,7 @@ The "Load from Refs" command works best when the file system is case insensitive
 
 To make "Load from Refs" work for all characters, characters in refs that are not allowed in filenames ('\', '/', ':', '*', '?', '"', '<', '>', '|') are URL-encoded; e.g. ':' becomes '%3a'. This means that the filenames must contain the URL-encoded characters. Filenames are URL-decoded before they are used to create user-display information, such as titles.
 
+Both the need for a case insensitive operating system and the need to URL-encode special characters in filenames can be avoided by using the "Split for Refs" command to make reference targets available from anchor blocks within a file.
 
 =head1 LICENSE
 
@@ -244,10 +278,11 @@ my %fileForId;
 my %fileForAnchor;
 my %rootFilters;
 my %rootLoadFromRefs;
+my %rootSplitsForRefs;
 
 # Find the root and file basics
 foreach my $filename (@ARGV) {
-    my $file = loadFile($filename, \%rootFilters, \%rootLoadFromRefs);
+    my $file = loadFile($filename, \%rootFilters, \%rootLoadFromRefs, \%rootSplitsForRefs);
     connectFile($file, \%rootFilters) if defined $file;
 }
 
@@ -261,6 +296,7 @@ sub loadFile
     my $filename = shift;
     my $parentFilters = shift;
     my $parentLoadFromRefs = shift;
+    my $parentSplitsForRefs = shift;
 
     # No need to reprocess filename that has been seen before
     return if exists $fileForFilename{$filename};
@@ -353,27 +389,20 @@ sub loadFile
     my @refdFilesToLoad;
     if (keys %$loadFromRefs) {
         while (<$fh>) {
-            # $psr causes problems in the following regular expression:
-            # source strings containing a colon in the $2 position end up
-            # not matching the regular expression
-            #while (/<#([^#+]+$psr)?([^#+$psr]+)#>/g) {
-            while (/<#([^#+]+\^)?([^#+^]+)#>/g) {
-                my $path = !defined $1 ? '' : $1;
-                chop $path;
-                my $name = nameFromTitle($2);
-                #print STDERR "Name to load: $name\n";
-                if (exists $$loadFromRefs{$path}) {
-                    my $template = $$loadFromRefs{$path};
-                    my $refFileName = $template =~ s/\*/$name/r;
-                    push @refdFilesToLoad, $refFileName;
-                    #print STDERR "Ref to load: $refFileName\n";
-                }
-            }
+            addRefdFilesToLoad($_, $loadFromRefs, \@refdFilesToLoad);
         }
     }
 
     # End file operations
     close $fh;
+    
+    # Set up and process splitsForRefs using loadFromRefs
+    my $splitsForRefs = $isRoot ? $parentSplitsForRefs : {%$parentSplitsForRefs};
+    if (exists $sysvars{'split for refs'}) {
+        foreach my $val (@{$sysvars{'split for refs'}}) {
+            splitFileForRefs($val, $loadFromRefs, $splitsForRefs);
+        }
+    }
     
     # Apply filters
     foreach my $uservarname (keys %uservars) {
@@ -429,6 +458,7 @@ sub loadFile
     $file{path} = $path;
     $file{loadFromRefs} = $loadFromRefs;
     $file{refdFilesToLoad} = \@refdFilesToLoad;
+    $file{splitsForRefs} = $splitsForRefs;
 
     # Define first file as root
     $root = \%file if $isRoot;
@@ -454,6 +484,7 @@ sub connectFile
     my $syscmds = $$file{syscmds};
     my $loadFromRefs = $$file{loadFromRefs};
     my $refdFilesToLoad = $$file{refdFilesToLoad};
+    my $splitsForRefs = $$file{splitsForRefs};
     
     # Add to filesAtPath
     if (exists $filesAtPath{$path}) {
@@ -500,7 +531,7 @@ sub connectFile
         elsif ($cmd eq 'child' || $cmd eq 'load') {
             my @files;
             foreach my $filename (glob $arg) {
-                my $file = loadFile($filename, $filters, $loadFromRefs);
+                my $file = loadFile($filename, $filters, $loadFromRefs, $splitsForRefs);
                 push @files, $file if defined $file;
             }
             foreach my $switch (reverse @{$switches}) {
@@ -521,7 +552,8 @@ sub connectFile
     
     # Load referenced files
     foreach my $refdFile (@{$refdFilesToLoad}) {
-        my $file = loadFile($refdFile, $filters, $loadFromRefs);
+        my $lcRefdFile = lc($refdFile);
+        my $file = exists $$splitsForRefs{$lcRefdFile} ? $$splitsForRefs{$lcRefdFile} : loadFile($refdFile, $filters, $loadFromRefs, $splitsForRefs);
         connectFile($file, $filters) if defined $file;
     }
 }
@@ -639,6 +671,90 @@ sub readProperties
     return 0;
 }
 
+sub addRefdFilesToLoad
+{
+    my $line = shift;
+    my $loadFromRefs = shift;
+    my $refdFilesToLoad = shift;
+    # $psr causes problems in the following regular expression:
+    # source strings containing a colon in the $2 position end up
+    # not matching the regular expression
+    #while ($line =~ /<#([^#+]+$psr)?([^#+$psr]+)#>/g) {
+    while ($line =~ /<#([^#+]+\^)?([^#+^]+)#>/g) {
+        my $path = !defined $1 ? '' : $1;
+        chop $path;
+        my $name = nameFromTitle($2);
+        #print STDERR "Name to load: $name\n";
+        if (exists $$loadFromRefs{$path}) {
+            my $template = $$loadFromRefs{$path};
+            my $refFileName = $template =~ s/\*/$name/r;
+            push @$refdFilesToLoad, $refFileName;
+            #print STDERR "Ref to load: $refFileName\n";
+        }
+    }
+}
+
+sub splitFileForRefs
+{
+    my $filename = shift;
+    my $loadFromRefs = shift;
+    my $splitsForRefs = shift;
+    my $file;
+    open (my $fh, '<', $filename) or die "Can't open $filename: $!";
+    while (<$fh>) {
+        if (/<(["'])(.+?)\1>/) {
+            my $char = $1;
+            my $body = $2;
+            if (defined $file) {
+                # This visible or invisible anchor block wraps
+                # up processing of previous visible anchor block
+                $$splitsForRefs{$$file{filename}} = $file;
+                undef $file;
+            }
+            if ($char eq '"') {
+                # Start processing visible anchor block
+                my ($path, $title) = $body =~ /(.+\^)?([^^]+)/;
+                $path = '' if not defined $path;
+                my $name = nameFromTitle($title);
+                my $id = $path . $name;
+                my $filename = lc($id);
+                my $anchor = an($id);
+                chop $path; # get rid of trailing path sep char
+                $file = {
+                    isRoot => 0,
+                    filename => $filename,
+                    id => $id,
+                    anchor => $anchor,
+                    name => $name,
+                    titlePrefix => '',
+                    title => $title,
+                    syscmds => [],
+                    sysvars => {},
+                    uservars => {},
+                    path => $path,
+                    lines => [$_],
+                    loadFromRefs => $loadFromRefs,
+                    refdFilesToLoad => [],
+                    splitsForRefs => $splitsForRefs,
+                };
+                addRefdFilesToLoad($_, $loadFromRefs, $$file{refdFilesToLoad});
+            }
+        }
+        elsif (defined $file) {
+            push @{$$file{lines}}, $_;
+            addRefdFilesToLoad($_, $loadFromRefs, $$file{refdFilesToLoad});
+        }
+    }
+    if (defined $file) {
+        $$splitsForRefs{$$file{filename}} = $file;
+        undef $file;
+    }
+    close $fh;
+    #foreach my $key (keys %$splitsForRefs) {
+    #    print STDERR "$key\n";
+    #}
+}
+
 sub addChildren
 {
     my $file = shift;
@@ -748,10 +864,8 @@ sub processFile
     # Set up file variables
     my $isRoot= $$file{isRoot};
     my $filename = $$file{filename};
-    my $anchor = $$file{anchor};
     my $name = $$file{name};
     my $titlePrefix = $$file{titlePrefix};
-    my $title = $$file{title};
     my $sysvars = $$file{sysvars};
     my $processShorthand = exists $$sysvars{"process shorthand"} ? ( lc @{$$sysvars{"process shorthand"}}[-1] eq "no" ? 0 : 1 ) : 1;
     my $prefixAdjustment = 0;
@@ -784,52 +898,74 @@ sub processFile
     }
 
     # Process file contents
-    open (my $fh, '<', $filename) or die "Can't open $filename: $!";
     my $ignoringProperties = 0;
-    while (<$fh>) {
-        # Skip through properties section
-        if ($ignoringProperties) {
-            $ignoringProperties = 0 if /$per/;
-            next;
+    if (exists $$file{lines}) {
+        my $lineNumber = 0;
+        foreach my $line (@{$$file{lines}}) {
+            procLine($file, $line, ++$lineNumber, $prefixAdjustment, $processShorthand, \$ignoringProperties);
         }
-        
-        if ($. == 1) {
-            # Add anchor if first line with prefix
-            if ($titlePrefix) {
-                # Add anchor and title
-                s/^(#*).*$/$1 <span id="$anchor">$title<\/span> /;
-            }
-            if (/$pbr/) {
-                $ignoringProperties = 1;
-                next;
-            }
-        }
-        elsif ($. == 2 && !$ignoringProperties) {
-            if (/$pbr/) {
-                $ignoringProperties = 1;
-                next;
-            }
-        }
-        
-        # Correct prefix lengths      
-        my ($prefix, $body) = /^(#*)(.*?)[\r\n]*$/;
-        if ($prefix && $titlePrefix) {
-            print '#' x ($prefixAdjustment + length $prefix)
-        }
-        
-        # Make sure there is a body
-        $body = "" if not $body;
-        
-        # Process angle-bracket shorthands
-        procShorthand($file, \$body) if $processShorthand;
-        
-        print $body . "\n";
     }
-    close $fh;
+    else {
+        open (my $fh, '<', $filename) or die "Can't open $filename: $!";
+        while (<$fh>) {
+            procLine($file, $_, $., $prefixAdjustment, $processShorthand, \$ignoringProperties);
+        }
+        close $fh;
+    }
     print $toc;
     
     # Prevent merge of last line of file with first line of next file
     print "\n\n";
+}
+
+sub procLine
+{
+    my $file = shift;
+    my $line = shift;
+    my $lineNumber = shift;
+    my $prefixAdjustment = shift;
+    my $processShorthand = shift;
+    my $ignoringProperties = shift;
+    my $anchor = $$file{anchor};
+    my $titlePrefix = $$file{titlePrefix};
+    my $title = $$file{title};
+    # Skip through properties section
+    if ($$ignoringProperties) {
+        $$ignoringProperties = 0 if $line =~ /$per/;
+        return;
+    }
+    
+    if ($lineNumber == 1) {
+        # Add anchor if first line with prefix
+        if ($titlePrefix) {
+            # Add anchor and title
+            $line =~ s/^(#*).*$/$1 <span id="$anchor">$title<\/span> /;
+        }
+        if ($line =~ /$pbr/) {
+            $$ignoringProperties = 1;
+            return;
+        }
+    }
+    elsif ($lineNumber == 2 && !$$ignoringProperties) {
+        if ($line =~ /$pbr/) {
+            $$ignoringProperties = 1;
+            return;
+        }
+    }
+    
+    # Correct prefix lengths      
+    my ($prefix, $body) = $line =~ /^(#*)(.*?)[\r\n]*$/;
+    if ($prefix && $titlePrefix) {
+        print '#' x ($prefixAdjustment + length $prefix)
+    }
+    
+    # Make sure there is a body
+    $body = "" if not $body;
+    
+    # Process angle-bracket shorthands
+    procShorthand($file, \$body) if $processShorthand;
+    
+    print $body . "\n";
 }
 
 sub procShorthand
