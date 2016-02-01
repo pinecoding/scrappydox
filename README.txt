@@ -192,20 +192,15 @@ DESCRIPTION
     for the Glossary~Complete.txt file, along with an appropriate "Load from
     Refs" command, is:
 
-        * Split for Refs: Glossary~Complete.txt
+        * Split for Refs: Glossary~Complete.txt using Glossary^*
         * Load from Refs: path Glossary using Glossary^*
 
-    Note that the file specification in the "Load from Refs" command does
-    not contain an extension. That is because the anchor blocks pulled out
-    of the file in the "Split for Refs" command are turned into pseudo-files
-    with a filename that is just a file-appropriate version of the anchor
-    name. For example, the anchor block for anchor
-
-        <"Glossary^Alluvial Fan">
-
-    is given the case-insensitive filename
-
-        glossary^alluvial_fan
+    Each anchor is turned into a filename by taking the name portion of the
+    anchor (ignoring the path) and substituting it for the asterisk in the
+    filename specification at the end of the statement. These generated
+    filenames can then be matched by the generated filenames in "Load from
+    Refs" statements. If a match is found, the anchor block is fit into the
+    hierarchy of sections based on the path in its generated filename.
 
     In addition to document construction capabilities, scrappydox supports
     the following shorthand notations:

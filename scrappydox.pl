@@ -142,16 +142,10 @@ The anchor block ends before the next line containing a visible or invisible anc
 
 To make anchor blocks available for "Load from Refs" commands, the file containing them must appear in a "Split for Refs" command. The command for the Glossary~Complete.txt file, along with an appropriate "Load from Refs" command, is:
 
-    * Split for Refs: Glossary~Complete.txt
+    * Split for Refs: Glossary~Complete.txt using Glossary^*
     * Load from Refs: path Glossary using Glossary^*
 
-Note that the file specification in the "Load from Refs" command does not contain an extension. That is because the anchor blocks pulled out of the file in the "Split for Refs" command are turned into pseudo-files with a filename that is just a file-appropriate version of the anchor name. For example, the anchor block for anchor
-
-    <"Glossary^Alluvial Fan">
-    
-is given the case-insensitive filename
-
-    glossary^alluvial_fan
+Each anchor is turned into a filename by taking the name portion of the anchor (ignoring the path) and substituting it for the asterisk in the filename specification at the end of the statement. These generated filenames can then be matched by the generated filenames in "Load from Refs" statements. If a match is found, the anchor block is fit into the hierarchy of sections based on the path in its generated filename.
     
 In addition to document construction capabilities, scrappydox supports the following shorthand notations:
 
@@ -271,6 +265,7 @@ my $currDate = dateString ("Std");
 
 # Global Data Structures
 my $root;
+my %connectedFiles;
 my %filesAtPath;
 my %filesAtPartialPath;
 my %fileForFilename;
@@ -300,6 +295,7 @@ sub loadFile
 
     # No need to reprocess filename that has been seen before
     return if exists $fileForFilename{$filename};
+    #print STDERR "Loading $filename\n";
 
     # First file is root ($root defined at end of first file processing)
     my $isRoot = !$root;
@@ -369,8 +365,10 @@ sub loadFile
             }
         }
     }
+    #print STDERR "For $filename prefix is not defined\n" if not defined $prefix;
     $prefix = $prefix ? $prefix : "";  
     $title = $title ? $title : titleFromName($name);
+    #print STDERR "$filename $prefix $title\n";
     
     # Set up loadFromRefs
     my $loadFromRefs = $isRoot ? $parentLoadFromRefs : {%$parentLoadFromRefs};
@@ -400,8 +398,12 @@ sub loadFile
     my $splitsForRefs = $isRoot ? $parentSplitsForRefs : {%$parentSplitsForRefs};
     if (exists $sysvars{'split for refs'}) {
         foreach my $val (@{$sysvars{'split for refs'}}) {
-            splitFileForRefs($val, $loadFromRefs, $splitsForRefs);
-        }
+            if ($val =~ /(\S+)\s+using\s+(\S+)/) {
+                my $filename = $1;
+                my $template = $2;
+                splitFileForRefs($filename, $template, $loadFromRefs, $splitsForRefs);
+             }
+       }
     }
     
     # Apply filters
@@ -479,6 +481,11 @@ sub connectFile
 {
     my $file = shift;
     my $parentFilters = shift;
+    my $id = $$file{id};
+    
+    return if exists $connectedFiles{$id}; # Prevent circular refs
+    $connectedFiles{$id} = undef; # undef is lowest footprint value
+    
     my $isRoot = $$file{isRoot};
     my $path = $$file{path};
     my $syscmds = $$file{syscmds};
@@ -552,6 +559,7 @@ sub connectFile
     
     # Load referenced files
     foreach my $refdFile (@{$refdFilesToLoad}) {
+        #print STDERR "Loading $refdFile\n";
         my $lcRefdFile = lc($refdFile);
         my $file = exists $$splitsForRefs{$lcRefdFile} ? $$splitsForRefs{$lcRefdFile} : loadFile($refdFile, $filters, $loadFromRefs, $splitsForRefs);
         connectFile($file, $filters) if defined $file;
@@ -697,6 +705,7 @@ sub addRefdFilesToLoad
 sub splitFileForRefs
 {
     my $filename = shift;
+    my $template = shift;
     my $loadFromRefs = shift;
     my $splitsForRefs = shift;
     my $file;
@@ -708,18 +717,19 @@ sub splitFileForRefs
             if (defined $file) {
                 # This visible or invisible anchor block wraps
                 # up processing of previous visible anchor block
-                $$splitsForRefs{$$file{filename}} = $file;
+                $$splitsForRefs{lc($$file{filename})} = $file;
                 undef $file;
             }
             if ($char eq '"') {
                 # Start processing visible anchor block
-                my ($path, $title) = $body =~ /(.+\^)?([^^]+)/;
-                $path = '' if not defined $path;
+                my ($origPath, $title) = $body =~ /(.+\^)?([^^]+)/;
                 my $name = nameFromTitle($title);
-                my $id = $path . $name;
-                my $filename = lc($id);
-                my $anchor = an($id);
-                chop $path; # get rid of trailing path sep char
+                my $filename = $template =~ s/\*/$name/r;
+                my ($filepath, $head, $id, $tail, $ext) = $filename =~ /^(.*\/)?(.*\+)?(.*?)(~.*)?(\.[^.]+)?$/;
+                die "Invalid filename for reference (missing main body): $filename" unless defined $id;
+                my ($anchor) = an($id);
+                my ($path) = $id =~ /(.+)$psr[^$psr]+$/;
+                $path = '' if not defined $path;
                 $file = {
                     isRoot => 0,
                     filename => $filename,
@@ -746,7 +756,7 @@ sub splitFileForRefs
         }
     }
     if (defined $file) {
-        $$splitsForRefs{$$file{filename}} = $file;
+        $$splitsForRefs{lc($$file{filename})} = $file;
         undef $file;
     }
     close $fh;
@@ -809,6 +819,9 @@ sub addChildren
             }
         }
         $$file{children} = \@children;
+        #foreach my $child (@children) {
+        #    print STDERR "$$file{filename} <- $$child{filename} $$child{titlePrefix}\n";
+        #}
     }
     
     # Sort the children
