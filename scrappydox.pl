@@ -249,15 +249,18 @@ if (@ARGV == 0) {
 }
 
 # Significant chars
+# Compiled regular expressions were causing problems. Colons
+# and parentheses were not matching properly with $psr. The following
+# definitions are used in comments to flag the locations where
+# these special characters are used.
 my $ps = '^'; # Path separator
-my $psr = qr/\^/; # Path separator regex
-my $ds = '+'; # Display separator
-my $dsr = qr/\+/; # Display separator regex
+#my $psr = qr/\^/; # Path separator regex
+#my $dsr = qr/\+/; # Display separator regex
 my $ii = '^^'; # ID indicator (use ID for URL)
 my $ni = '^'; # name indicator (use name for URL)
 my $ss = '_'; # Space substitute (in URLs and filenames)
-my $pbr = qr/^<!--\s*$/; # Begin properties section regex
-my $per = qr/^-->\s*$/; # End properties section regex
+#my $pbr = qr/^<!--\s*$/; # Begin properties section regex
+#my $per = qr/^-->\s*$/; # End properties section regex
 
 # Global Values
 #my $currDate = dateString ("Datime");
@@ -305,34 +308,34 @@ sub loadFile
     die "Invalid filename (missing extension): $filename" unless defined $ext;
     die "Invalid filename (missing main body): $filename" unless defined $middle;
 
-    my $searchPartialPaths = $middle =~ /$psr$/;
+    my $searchPartialPaths = $middle =~ /\^$/; #$psr
     if ($searchPartialPaths) {
-        $middle =~ s/$psr$//;
+        $middle =~ s/\^$//; #$psr
     }
         
     # Anchor is filename in lower case without head or tail,
     #   and with spaces translated to underscores
     #   and with no initial path separator character
-    my ($anchor) = $middle =~ /^$psr?(.*)$/;
+    my ($anchor) = $middle =~ /^\^?(.*)$/; #$psr
     $anchor = an($anchor);
     
     # Name is last string in path
-    my ($name) = $middle =~ /([^$psr]+)$/;
+    my ($name) = $middle =~ /([^^]+)$/; #$psr
     die "Invalid filename: $filename" unless defined $name;
     
     # Determine ID from $middle
     my $id;
     if ($isRoot) {
         # Remove any initial path separator character
-        $id = $middle =~ s/^$psr//r;
+        $id = $middle =~ s/^\^//r; #$psr
     }
     else {
         # Extend non-root IDs that start with path separator character
-        if ($middle =~ /^$psr/) {
+        if ($middle =~ /^\^/) { #$psr
             $id = $$root{id} . $middle;
         }
         # Extend non-root IDs that have no path
-        elsif (!($middle =~ /$psr/)) {
+        elsif (!($middle =~ /\^/)) { #$psr
             $id = $$root{id} . $ps . $middle;
         }
         else {
@@ -341,7 +344,7 @@ sub loadFile
     }
 
     # Determine path
-    my ($path) = $id =~ /(.+)$psr[^$psr]+$/;
+    my ($path) = $id =~ /(.+)\^[^^]+$/; #$psr
     if (!defined($path)) {
         $path = '';
     }
@@ -492,6 +495,7 @@ sub connectFile
     my $loadFromRefs = $$file{loadFromRefs};
     my $refdFilesToLoad = $$file{refdFilesToLoad};
     my $splitsForRefs = $$file{splitsForRefs};
+    #printf STDERR "Connecting $$file{filename} $path\n";
     
     # Add to filesAtPath
     if (exists $filesAtPath{$path}) {
@@ -502,7 +506,7 @@ sub connectFile
     }
 
     # Add to filesAtPartialPath
-    my ($partialPath) = $path =~ /^([^$psr]+)$psr/;
+    my ($partialPath) = $path =~ /^([^^]+)\^/; #$psr
     if ($partialPath) {
         # print STDERR "Partial path: $partialPath\n";
         if (exists $filesAtPartialPath{$partialPath}) {
@@ -649,10 +653,10 @@ sub readProperties
     my $uservars = shift;
     my $fh = shift;
     my $line = shift;
-    if ($line =~ /$pbr/) {
+    if ($line =~ /^<!--\s*$/) { #$pbr
         my $lastSyscmd;
         while (<$fh>) {
-            last if (/$per/);
+            last if (/^-->\s*$/); #$per
             next if (/^\s*$/);
             if (/^\s{0,3}([*+])\s+(.*?)\s*:\s+(.*?)\s*$/) {
                 my $hash = $1 eq '*' ? $sysvars : $uservars;
@@ -684,11 +688,7 @@ sub addRefdFilesToLoad
     my $line = shift;
     my $loadFromRefs = shift;
     my $refdFilesToLoad = shift;
-    # $psr causes problems in the following regular expression:
-    # source strings containing a colon in the $2 position end up
-    # not matching the regular expression
-    #while ($line =~ /<#([^#+]+$psr)?([^#+$psr]+)#>/g) {
-    while ($line =~ /<#([^#+]+\^)?([^#+^]+)#>/g) {
+    while ($line =~ /<#([^#+]+\^)?([^#+^]+)#>/g) { #$psr
         my $path = !defined $1 ? '' : $1;
         chop $path;
         my $name = nameFromTitle($2);
@@ -728,7 +728,7 @@ sub splitFileForRefs
                 my ($filepath, $head, $id, $tail, $ext) = $filename =~ /^(.*\/)?(.*\+)?(.*?)(~.*)?(\.[^.]+)?$/;
                 die "Invalid filename for reference (missing main body): $filename" unless defined $id;
                 my ($anchor) = an($id);
-                my ($path) = $id =~ /(.+)$psr[^$psr]+$/;
+                my ($path) = $id =~ /(.+)\^[^^]+$/; #$psr
                 $path = '' if not defined $path;
                 $file = {
                     isRoot => 0,
@@ -804,7 +804,7 @@ sub addChildren
                     addChildren ($child, $fullPath . $ps . $$child{name}, \%isysvars, \%iuservars);
                 }
             }
-            $searchPath =~ s/[^$psr]*$psr?//;
+            $searchPath =~ s/[^^]*\^?//; #$psr
         }
         if ($$file{searchPartialPaths} && !@children) {
             # Search partial paths
@@ -813,7 +813,7 @@ sub addChildren
                 my $files = $filesAtPartialPath{$name};
                 push @children, @{$files};
                 foreach my $child (@{$files}) {
-                    my $childFullPath = $fullPath . ($$child{id} =~ s/^[^$psr]+//r);
+                    my $childFullPath = $fullPath . ($$child{id} =~ s/^[^^]+//r); #$psr
                     addChildren ($child, $childFullPath, \%isysvars, \%iuservars);
                 }
             }
@@ -944,7 +944,7 @@ sub procLine
     my $title = $$file{title};
     # Skip through properties section
     if ($$ignoringProperties) {
-        $$ignoringProperties = 0 if $line =~ /$per/;
+        $$ignoringProperties = 0 if $line =~ /^-->\s*$/; #$per
         return;
     }
     
@@ -954,13 +954,13 @@ sub procLine
             # Add anchor and title
             $line =~ s/^(#*).*$/$1 <span id="$anchor">$title<\/span> /;
         }
-        if ($line =~ /$pbr/) {
+        if ($line =~ /^<!--\s*$/) { #$pbr
             $$ignoringProperties = 1;
             return;
         }
     }
     elsif ($lineNumber == 2 && !$$ignoringProperties) {
-        if ($line =~ /$pbr/) {
+        if ($line =~ /^<!--\s*$/) { #$pbr
             $$ignoringProperties = 1;
             return;
         }
@@ -1031,8 +1031,8 @@ sub proc
         else {
             # Anchor is a regular path
             procVarShorthand($file, \$body);
-            my @pathParts = split $psr, $body;
-            $display = (split $dsr, $pathParts[-1])[-1] =~ s/$ss/ /gr;
+            my @pathParts = split /\^/, $body; #$psr
+            $display = (split /\+/, $pathParts[-1])[-1] =~ s/$ss/ /gr; #$dsr
             if (!$pathParts[0]) {
                 # Starts with path separator:
                 # In-file nested anchor
@@ -1049,8 +1049,8 @@ sub proc
     }
     if ($char eq '#') { # Link
         procVarShorthand($file, \$body);
-        my @pathParts = split $psr, $body;
-        my $display = (split $dsr, $pathParts[-1])[-1] =~ s/$ss/ /gr;
+        my @pathParts = split /\^/, $body; #$psr
+        my $display = (split /\+/, $pathParts[-1])[-1] =~ s/$ss/ /gr; #$dsr
         my $url;
         #print STDERR $char . ' ' . $display . "\n";
         if (!$pathParts[0]) {
@@ -1252,7 +1252,7 @@ sub an
     # The name (not path) portion of the input to this subroutine may use
     # URL encoding, so URL decoding is performed on the name first.
     my $anchor = shift;
-    $anchor =~ s/([^$psr]+)$/ urlDecode($1) /e;
+    $anchor =~ s/([^^]+)$/ urlDecode($1) /e; #$psr
     $anchor =~ s/ /$ss/g; # substitute spaces
     $anchor =~ s/([:;,.!?%@&#*=~\$'"\\\/()<>{}[\]])/ sprintf ".%02x", ord $1 /eg;
     return (lc $anchor);
