@@ -688,16 +688,32 @@ sub addRefdFilesToLoad
     my $line = shift;
     my $loadFromRefs = shift;
     my $refdFilesToLoad = shift;
-    while ($line =~ /<#([^#+]+\^)?([^#+^]+)#>/g) { #$psr
-        my $path = !defined $1 ? '' : $1;
-        chop $path;
-        my $name = nameFromTitle($2);
-        #print STDERR "Name to load: $name\n";
-        if (exists $$loadFromRefs{$path}) {
-            my $template = $$loadFromRefs{$path};
-            my $refFileName = $template =~ s/\*/$name/r;
-            push @$refdFilesToLoad, $refFileName;
-            #print STDERR "Ref to load: $refFileName\n";
+    while ($line =~ /<([@#])(.+?)\1>/g) {
+        my $char = $1;
+        my $body = $2;
+        if ($char eq '@') {
+            open (my $fh, '<', $body) or die "Can't open $body: $!";
+            if (defined $fh) {
+                my $includedOutput;
+                while (my $iline = <$fh>) {
+                    addRefdFilesToLoad($iline, $loadFromRefs, $refdFilesToLoad);
+                }
+                close $fh;
+            }
+        }
+        elsif ($char eq '#') {
+            if ($body =~ /^([^+]+\^)?([^+^]+)$/) { #$psr
+                my $path = !defined $1 ? '' : $1;
+                chop $path;
+                my $name = nameFromTitle($2);
+                #print STDERR "Name to load: $name\n";
+                if (exists $$loadFromRefs{$path}) {
+                    my $template = $$loadFromRefs{$path};
+                    my $refFileName = $template =~ s/\*/$name/r;
+                    push @$refdFilesToLoad, $refFileName;
+                    #print STDERR "Ref to load: $refFileName\n";
+                }
+            }
         }
     }
 }
