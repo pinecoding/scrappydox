@@ -8,17 +8,17 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #>
 
-if ($Args.length -ne 2) {
+if ($Args.length -ne 1) {
     $cmdname = $MyInvocation.MyCommand.Name
-    Write-Host "$cmdname infile outfile"
+    Write-Host "$cmdname file"
     Exit
 }
 #Write-Host $Args[0];
 #$curdir = Split-Path $MyInvocation.MyCommand.Path
 #$fileIn = $curdir + '\' + $Args[0]
 #$fileOut = $curdir + '\' + $Args[1]
-$fileIn = [System.IO.Path]::GetFullPath($Args[0])
-$fileOut = [System.IO.Path]::GetFullPath($Args[1])
+#$fileIn = [System.IO.Path]::GetFullPath($Args[0])
+$fileOut = [System.IO.Path]::GetFullPath($Args[0])
 #Write-Host $fileIn
 #Get-Content "README.txt"
 #Exit

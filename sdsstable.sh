@@ -32,4 +32,5 @@ fi
 scriptdir="`dirname $0`"
 psfile="$scriptdir/sdsstable.ps1"
 wpsfile="`cygpath -w $psfile`"
-powershell -NoProfile -ExecutionPolicy Bypass -file "$wpsfile" "$1"
+warg1="`cygpath -w $1`"
+powershell -NoProfile -ExecutionPolicy Bypass -file "$wpsfile" "$warg1"
