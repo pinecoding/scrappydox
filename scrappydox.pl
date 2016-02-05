@@ -608,7 +608,7 @@ sub sortFiles
                 $sortkey = "";
             }
         }
-        $$file{sortkey} = $sortkey;  
+        $$file{sortkey} = lc($sortkey);  
     }
     my $sortfn;
     if ($isAscending) {
