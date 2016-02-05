@@ -1,11 +1,7 @@
 #!/bin/bash
 
 # 
-# install.sh - install scrappydox and sdpd to usr/local/bin
-#
-#   scrappydox.pl installs to /usr/local/bin/scrappydox
-#
-#   build.sh installs to /usr/local/bin/sdpd
+# sdssclean.sh - runs sdssclean.ps1 PowerShell script
 # 
 # Copyright (c) 2015 Sam Gabriel
 # 
@@ -29,15 +25,11 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 # 
 
-cp scrappydox.pl /usr/local/bin/scrappydox
-chmod +x /usr/local/bin/scrappydox
-cp build.sh /usr/local/bin/sdpd
-sed -i '/perl scrappydox.pl/s/perl scrappydox.pl/scrappydox/' /usr/local/bin/sdpd
-chmod +x /usr/local/bin/sdpd
-cp sdssclean.ps1 /usr/local/bin/
-cp sdssclean.sh /usr/local/bin/sdssclean
-chmod +x /usr/local/bin/sdssclean
-cp sdsstable.ps1 /usr/local/bin/
-cp sdsstable.sh /usr/local/bin/sdsstable
-chmod +x /usr/local/bin/sdsstable
-
+if [ $# -ne 2 ]; then
+    echo "$0 infile outfile"
+    exit 0
+fi
+scriptdir="`dirname $0`"
+psfile="$scriptdir/sdssclean.ps1"
+wpsfile="`cygpath -w $psfile`"
+powershell -NoProfile -ExecutionPolicy Bypass -file "$wpsfile" "$1" "$2"
