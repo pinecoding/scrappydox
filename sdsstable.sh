@@ -23,14 +23,19 @@
 # CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-# 
+#
 
-if [ $# -ne 1 ]; then
-    echo "$0 file"
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+    echo "$0 file [sheet]"
     exit 0
+fi
+if [ -z $2 ]; then
+    sheet=1
+else
+    sheet="$2"
 fi
 scriptdir="`dirname $0`"
 psfile="$scriptdir/sdsstable.ps1"
 wpsfile="`cygpath -w $psfile`"
 warg1="`cygpath -w $1`"
-powershell -NoProfile -ExecutionPolicy Bypass -file "$wpsfile" "$warg1"
+powershell -NoProfile -ExecutionPolicy Bypass -file "$wpsfile" "$warg1" "$sheet"

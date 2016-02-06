@@ -8,19 +8,34 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #>
 
+Param(
+  [string]$file = '',
+  [int]$sheet = 1
+)
+
+if ($file -eq '') {
+    $cmdname = $MyInvocation.MyCommand.Name
+    Write-Host "$cmdname file [sheet]"
+    Exit
+}
+
+<#
 if ($Args.length -ne 1) {
     $cmdname = $MyInvocation.MyCommand.Name
     Write-Host "$cmdname file"
     Exit
 }
-$fileIn = [System.IO.Path]::GetFullPath($Args[0])
+#>
+
+#$file = [System.IO.Path]::GetFullPath($Args[0])
+$file = [System.IO.Path]::GetFullPath($file)
 $excel = New-Object -comobject Excel.Application
 $excel.Visible = $false
 $excel.DisplayAlerts = $false
-$workbook = $excel.Workbooks.Open($fileIn)
-$sheet = $workbook.Sheets.Item(1)
-$cells = $sheet.Cells
-$usedRange = $sheet.UsedRange
+$workbook = $excel.Workbooks.Open($file)
+$worksheet = $workbook.Sheets.Item($sheet)
+$cells = $worksheet.Cells
+$usedRange = $worksheet.UsedRange
 $colCount = $usedRange.Columns.Count
 $colFirst = $usedRange.Column
 $colLast = $colFirst + $colCount - 1
@@ -35,14 +50,27 @@ for ($row = $rowFirst; $row -le $rowLast; $row++) {
         $type = 'th'
     }
     for ($col = $colFirst; $col -le $colLast; $col++) {
-        $content = $cells.Item($row, $col).Text
-        $line += '<' + $type + '>' + $content + '</' + $type + '>'
+        $item = $cells.Item($row, $col)
+        $colorIndex = $item.Interior.ColorIndex
+        [int]$rgb = $item.Interior.Color
+        $hexRgb = "{0:X6}" -f $rgb
+        $hexB = $hexRgb.Substring(0,2)
+        $hexG = $hexRgb.Substring(2,2)
+        $hexR = $hexRgb.Substring(4,2)
+        $hexRgb = '#' + $hexR +$hexG + $hexB
+        $style = ''
+        if ($colorIndex -ne -4142) {
+            #$Host.UI.WriteErrorLine("$row $col $colorIndex ($hexRgb)")
+            $style = " style=`"background-color: $hexRgb`""
+        }
+        $content = $item.Text
+        $line += '<' + $type + $style + '>' + $content + '</' + $type + '>'
     }
     $line += '</tr>'
     Write-Host $line
 }
 Write-Host '</table>'
-$workbook.Save()
+#$workbook.Save()
 $workbook.Close()
 $excel.Quit()
 $rv = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel);
