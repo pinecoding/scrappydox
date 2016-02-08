@@ -25,17 +25,48 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-if [ $# -lt 1 ] || [ $# -gt 2 ]; then
-    echo "$0 file [sheet]"
-    exit 0
+syntax () {
+    echo "$0 file [sheet] [-sort]" 1>&2
+    exit 1
+}
+
+if [ $# -lt 1 ] || [ $# -gt 3 ]; then
+    syntax
 fi
-if [ -z $2 ]; then
-    sheet=1
-else
-    sheet="$2"
+file=""
+sheet=1
+sort=""
+position=0
+for arg in "$@"; do
+    case $arg in
+        -s|--sort)
+            sort="-sort"
+            ;;
+        *)
+            case $position in
+                0)
+                    file="$arg"
+                    ;;
+                1)
+                    sheet="$arg"
+                    ;;
+                *)
+                    syntax
+                    ;;
+            esac
+            ((position++))
+            ;;
+    esac
+done
+if [ -z "$file" ]; then
+    syntax
 fi
 scriptdir="`dirname $0`"
 psfile="$scriptdir/sdsstable.ps1"
 wpsfile="`cygpath -w $psfile`"
-warg1="`cygpath -w $1`"
-powershell -NoProfile -ExecutionPolicy Bypass -file "$wpsfile" "$warg1" "$sheet"
+wfile="`cygpath -w $file`"
+#echo "file: $file" 1>&2
+#echo "sheet: $sheet" 1>&2
+#echo "sort: $sort" 1>&2
+#exit 1
+powershell -NoProfile -ExecutionPolicy Bypass -file "$wpsfile" "$wfile" "$sheet" "$sort"

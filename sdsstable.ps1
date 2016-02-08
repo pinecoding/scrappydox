@@ -10,7 +10,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Param(
   [string]$file = '',
-  [int]$sheet = 1
+  [int]$sheet = 1,
+  [switch]$sort
 )
 
 if ($file -eq '') {
@@ -49,6 +50,7 @@ for ($row = $rowFirst; $row -le $rowLast; $row++) {
     if ($row -eq $rowFirst) {
         $type = 'th'
     }
+    [int]$outcol = 0
     for ($col = $colFirst; $col -le $colLast; $col++) {
         $item = $cells.Item($row, $col)
         $colorIndex = $item.Interior.ColorIndex
@@ -64,7 +66,17 @@ for ($row = $rowFirst; $row -le $rowLast; $row++) {
             $style = " style=`"background-color: $hexRgb`""
         }
         $content = $item.Text
-        $line += '<' + $type + $style + '>' + $content + '</' + $type + '>'
+        $line += '<' + $type + $style + '>'
+        if (($row -eq $rowFirst) -and $sort) {
+            $line += '<button href="" onclick="' + "sort(this.parentNode.parentNode.parentNode.parentNode," +  $outcol + ")" + '">'
+            $line += $content
+            $line += "</button>" 
+        }
+        else {
+            $line += $content
+        }
+        $line += '</' + $type + '>'
+        $outcol++
     }
     $line += '</tr>'
     Write-Host $line
@@ -74,4 +86,5 @@ Write-Host '</table>'
 $workbook.Close()
 $excel.Quit()
 $rv = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel);
+
 
