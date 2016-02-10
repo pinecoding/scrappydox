@@ -26,15 +26,16 @@
 #
 
 syntax () {
-    echo "$0 file [sheet] [-sort]" 1>&2
+    echo "$0 file [sheet] [class] [-sort]" 1>&2
     exit 1
 }
 
-if [ $# -lt 1 ] || [ $# -gt 3 ]; then
+if [ $# -lt 1 ] || [ $# -gt 4 ]; then
     syntax
 fi
 file=""
 sheet=1
+class=""
 sort=""
 position=0
 for arg in "$@"; do
@@ -49,6 +50,9 @@ for arg in "$@"; do
                     ;;
                 1)
                     sheet="$arg"
+                    ;;
+                2)
+                    class="$arg"
                     ;;
                 *)
                     syntax
@@ -67,6 +71,7 @@ wpsfile="`cygpath -w $psfile`"
 wfile="`cygpath -w $file`"
 #echo "file: $file" 1>&2
 #echo "sheet: $sheet" 1>&2
+#echo "class: $class" 1>&2
 #echo "sort: $sort" 1>&2
 #exit 1
-powershell -NoProfile -ExecutionPolicy Bypass -file "$wpsfile" "$wfile" "$sheet" "$sort"
+powershell -NoProfile -ExecutionPolicy Bypass -file "$wpsfile" "$wfile" "$sheet" "$class" "$sort" 

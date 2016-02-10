@@ -11,24 +11,22 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 Param(
   [string]$file = '',
   [int]$sheet = 1,
+  [string]$class = '',
   [switch]$sort
 )
 
 if ($file -eq '') {
     $cmdname = $MyInvocation.MyCommand.Name
-    Write-Host "$cmdname file [sheet]"
-    Exit
+    Write-Host "$cmdname file [class] [sheet]"
+    Exit 1
 }
 
 <#
-if ($Args.length -ne 1) {
-    $cmdname = $MyInvocation.MyCommand.Name
-    Write-Host "$cmdname file"
-    Exit
-}
+$Host.UI.WriteErrorLine("file $file")
+$Host.UI.WriteErrorLine("sheet $sheet")
+$Host.UI.WriteErrorLine("class $class")
 #>
 
-#$file = [System.IO.Path]::GetFullPath($Args[0])
 $file = [System.IO.Path]::GetFullPath($file)
 $excel = New-Object -comobject Excel.Application
 $excel.Visible = $false
@@ -43,7 +41,12 @@ $colLast = $colFirst + $colCount - 1
 $rowCount = $usedRange.Rows.Count
 $rowFirst = $usedRange.Row
 $rowLast = $rowFirst + $rowCount - 1
-Write-Host '<table>'
+if ($class) {
+    Write-Host "<table class=`"$class`">"
+}
+else {
+    Write-Host '<table>'
+}
 for ($row = $rowFirst; $row -le $rowLast; $row++) {
     $line = '<tr>'
     $type = 'td'
@@ -82,7 +85,6 @@ for ($row = $rowFirst; $row -le $rowLast; $row++) {
     Write-Host $line
 }
 Write-Host '</table>'
-#$workbook.Save()
 $workbook.Close()
 $excel.Quit()
 $rv = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel);
