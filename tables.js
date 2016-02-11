@@ -1,5 +1,6 @@
 <script type="text/javascript">
-function sort(table, col) {
+function sort(table, col)
+{
     if (table.hasOwnProperty("s3g_prevCol")) {
         var prevCol = table.s3g_prevCol;
     }
@@ -54,5 +55,15 @@ function sort(table, col) {
         table.appendChild(items[i].row);
     }
     items = null;
+}
+function toggleRowDisplay(nodes, toggleClass)
+{
+    for (var i = 0, len = nodes.length; i < len; i++) {
+        var node = nodes[i];
+        if (node.className == toggleClass) {
+            var style = node.style;
+            style.display = style.display == 'none' ? 'table-row' : 'none';
+        }
+    }
 }
 </script>
