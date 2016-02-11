@@ -1,8 +1,10 @@
 <script type="text/javascript">
 function sort(table, col) {
-    var prevCol = -1;
     if (table.hasOwnProperty("s3g_prevCol")) {
-        prevCol = table.s3g_prevCol;
+        var prevCol = table.s3g_prevCol;
+    }
+    else {
+        var prevCol = -1;
     }
     table.s3g_prevCol = col;
     var order = 1;
@@ -16,21 +18,37 @@ function sort(table, col) {
     var rows = table.rows;
     var len = rows.length;
     var dataLength = rows.length - 1;
-    for(var i = 1; i < len; i++) {
+    var numeric = true;
+    for (var i = 1; i < len; i++) {
         var row = rows[i];
         var item = {};
         item.oldkey = i; // to enforce stable sort
         //console.log(row.cells[col].textContent);
-        item.newkey = row.cells[col].textContent;
+        var textval = row.cells[col].textContent;
+        if (numeric && isNaN(textval)) {
+            numeric = false;
+        }
+        item.newkey = textval;
         item.row = rows[i];
         items.push(item);
     }
+    if (numeric) {
+        for (var i = 0, len = items.length; i < len; i++) {
+            var item = items[i];
+            item.newkey = Number(item.newkey);
+        } 
+    }
     items.sort(function(a, b) {
-        var lc = a.newkey.localeCompare(b.newkey);
-        if (lc != 0) {
-            return lc * order;
+        if (numeric) {
+            var c = a.newkey - b.newkey;
         }
-        return (item.oldkey - item.newkey) * order;
+        else {
+            var c = a.newkey.localeCompare(b.newkey);
+        }
+        if (c != 0) {
+            return c * order;
+        }
+        return a.oldkey - b.oldkey
     });
     for (var i = 0, len = items.length; i < len; i++) {
         table.appendChild(items[i].row);
