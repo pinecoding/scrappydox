@@ -75,7 +75,7 @@ The HTML comment begin and end indicators must be flush left, and each on its ow
 
 Each "Child" command loads a file as a child section, or files as child sections (if wildcards are used). Each "Load" command loads files for path matching, where each file must have a path that matches a filename in the document in order to be included as a subsection under the matched filename.
 
-"Child" and "Load" commands can include a title modifier as a subbullet that begins with a dash. This is generally applied to a "Child" command for a single file, to change the title of the resulting child section. That way a file can be reused as-is in multiple documents, where the section title must be appropriate for the containing document.
+"Child" and "Load" commands can include a title modifier as a subbullet that begins with a dash. For each file, the resulting section title becomes the title in the modifier plus the original title, where the original title replaces the first asterisk (if any) found in the title modifier. This is generally applied to a "Child" command for a single file, to change the title of the resulting child section. That way a file can be reused as-is in multiple documents, where the section title must be appropriate for the containing document.
 
 "Child" and "Load" commands can include sort modifiers as subbullets. Two are in the example above:
 
@@ -561,7 +561,9 @@ sub connectFile
                 }
             }
             foreach my $file (@files) {
-                $$file{title} = $title if $title;
+                if ($title) {
+                    $$file{title} = $title =~ s/\*/$$file{title}/r;
+                }
                 connectFile($file, $filters);
                 push @children, $file if $cmd eq 'child';
             }
