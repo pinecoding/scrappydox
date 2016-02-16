@@ -63,6 +63,7 @@ DESCRIPTION
         * Child: Announcements.txt
         * Load: Announcements^*.txt
         * Child: Stories.txt
+            - Title: Trail Tails
         * Load: ../_Stories/Stories^*.txt
             - Sort: ascending alpha using field
             - Sort: ascending alpha on name
@@ -86,8 +87,14 @@ DESCRIPTION
     in the document in order to be included as a subsection under the
     matched filename.
 
-    "Child" and "Load" commands can include sort modifiers as subbullets
-    that begin with dashes. Two are in the example above:
+    "Child" and "Load" commands can include a title modifier as a subbullet
+    that begins with a dash. This is generally applied to a "Child" command
+    for a single file, to change the title of the resulting child section.
+    That way a file can be reused as-is in multiple documents, where the
+    section title must be appropriate for the containing document.
+
+    "Child" and "Load" commands can include sort modifiers as subbullets.
+    Two are in the example above:
 
             - Sort: ascending alpha using field
             - Sort: ascending alpha on name

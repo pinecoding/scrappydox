@@ -57,6 +57,7 @@ An HTML comment block at the top of the docment, or after the title line (first 
     * Child: Announcements.txt
     * Load: Announcements^*.txt
     * Child: Stories.txt
+        - Title: Trail Tails
     * Load: ../_Stories/Stories^*.txt
         - Sort: ascending alpha using field
         - Sort: ascending alpha on name
@@ -74,7 +75,9 @@ The HTML comment begin and end indicators must be flush left, and each on its ow
 
 Each "Child" command loads a file as a child section, or files as child sections (if wildcards are used). Each "Load" command loads files for path matching, where each file must have a path that matches a filename in the document in order to be included as a subsection under the matched filename.
 
-"Child" and "Load" commands can include sort modifiers as subbullets that begin with dashes. Two are in the example above:
+"Child" and "Load" commands can include a title modifier as a subbullet that begins with a dash. This is generally applied to a "Child" command for a single file, to change the title of the resulting child section. That way a file can be reused as-is in multiple documents, where the section title must be appropriate for the containing document.
+
+"Child" and "Load" commands can include sort modifiers as subbullets. Two are in the example above:
 
         - Sort: ascending alpha using field
         - Sort: ascending alpha on name
@@ -545,8 +548,12 @@ sub connectFile
                 my $file = loadFile($filename, $filters, $loadFromRefs, $splitsForRefs);
                 push @files, $file if defined $file;
             }
+            my $title = '';
             foreach my $switch (reverse @{$switches}) {
-                if ($switch =~ /^sort\s*:\s+reverse$/i) {
+                if ($switch =~ /^title\s*:\s+(.+?)\s*$/i) {
+                    $title = $1;
+                }
+                elsif ($switch =~ /^sort\s*:\s+reverse$/i) {
                     @files = reverse @files;
                 }
                 elsif ($switch =~ /^sort\s*:\s+(ascending|descending)\s+(alpha|numeric)\s+(on|using)\s+(.+)$/i) {
@@ -554,6 +561,7 @@ sub connectFile
                 }
             }
             foreach my $file (@files) {
+                $$file{title} = $title if $title;
                 connectFile($file, $filters);
                 push @children, $file if $cmd eq 'child';
             }
