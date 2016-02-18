@@ -308,8 +308,8 @@ sub loadFile
 
     # Head, Tail, and Extension Processing
     my ($filepath, $head, $middle, $tail, $ext) = $filename =~ /^(.*\/)?(.*\+)?(.*?)(~.*)?\.([^.]+)$/;
-    die "Invalid filename (missing extension): $filename" unless defined $ext;
-    die "Invalid filename (missing main body): $filename" unless defined $middle;
+    die "Invalid filename (missing extension): $filename\n" unless defined $ext;
+    die "Invalid filename (missing main body): $filename\n" unless defined $middle;
 
     my $searchPartialPaths = $middle =~ /\^$/; #$psr
     if ($searchPartialPaths) {
@@ -324,7 +324,7 @@ sub loadFile
     
     # Name is last string in path
     my ($name) = $middle =~ /([^^]+)$/; #$psr
-    die "Invalid filename: $filename" unless defined $name;
+    die "Invalid filename: $filename\n" unless defined $name;
     
     # Determine ID from $middle
     my $id;
@@ -358,7 +358,7 @@ sub loadFile
     my @syscmds;
     my %sysvars;
     my %uservars;
-    open (my $fh, '<', $filename) or die "Can't open $filename: $!";
+    open (my $fh, '<', $filename) or die "Can't open $filename: $!\n";
     
     # Obtain information from first line of file
     if (defined($_ = <$fh>)) {
@@ -444,7 +444,7 @@ sub loadFile
     }
     
     # Make sure ID is unique (should have been caught with anchor test above)
-    die "Duplicate ID: $id" if exists $fileForId{$id};
+    die "Duplicate ID: $id\n" if exists $fileForId{$id};
     
     # Bundle information about file in hash
     my %file;
@@ -702,7 +702,7 @@ sub addRefdFilesToLoad
         my $char = $1;
         my $body = $2;
         if ($char eq '@') {
-            open (my $fh, '<', $body) or die "Can't open $body: $!";
+            open (my $fh, '<', $body) or die "Can't open include file $body: $!\n";
             if (defined $fh) {
                 my $includedOutput;
                 while (my $iline = <$fh>) {
@@ -735,7 +735,7 @@ sub splitFileForRefs
     my $loadFromRefs = shift;
     my $splitsForRefs = shift;
     my $file;
-    open (my $fh, '<', $filename) or die "Can't open $filename: $!";
+    open (my $fh, '<', $filename) or die "Can't open $filename: $!\n";
     while (<$fh>) {
         if (/<(["'])(.+?)\1>/) {
             my $char = $1;
@@ -752,7 +752,7 @@ sub splitFileForRefs
                 my $name = nameFromTitle($title);
                 my $filename = $template =~ s/\*/$name/r;
                 my ($filepath, $head, $id, $tail, $ext) = $filename =~ /^(.*\/)?(.*\+)?(.*?)(~.*)?(\.[^.]+)?$/;
-                die "Invalid filename for reference (missing main body): $filename" unless defined $id;
+                die "Invalid filename for reference (missing main body): $filename\n" unless defined $id;
                 my ($anchor) = an($id);
                 my ($path) = $id =~ /(.+)\^[^^]+$/; #$psr
                 $path = '' if not defined $path;
@@ -945,7 +945,7 @@ sub processFile
         }
     }
     else {
-        open (my $fh, '<', $filename) or die "Can't open $filename: $!";
+        open (my $fh, '<', $filename) or die "Can't open $filename: $!\n";
         while (<$fh>) {
             procLine($file, $_, $., $prefixAdjustment, $processShorthand, \$ignoringProperties);
         }
@@ -1027,7 +1027,7 @@ sub proc
     my $char = shift;
     my $body = shift;
     if ($char eq '@') { # File to include
-        open (my $fh, '<', $body) or die "Can't open $body: $!";
+        open (my $fh, '<', $body) or die "Can't open $body: $!\n";
         if (defined $fh) {
             my $includedOutput;
             while (my $line = <$fh>) {
