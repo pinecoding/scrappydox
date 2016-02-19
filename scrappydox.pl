@@ -283,7 +283,7 @@ my %rootSplitsForRefs;
 
 # Find the root and file basics
 foreach my $filename (@ARGV) {
-    my $file = loadFile($filename, \%rootFilters, \%rootLoadFromRefs, \%rootSplitsForRefs);
+    my $file = loadFile('', 0, $filename, \%rootFilters, \%rootLoadFromRefs, \%rootSplitsForRefs);
     connectFile($file, \%rootFilters) if defined $file;
 }
 
@@ -294,6 +294,8 @@ processTree ($root, 0, \&processFile);
 
 sub loadFile
 {
+    my $fromFilename = shift;
+    my $fromLinenum = shift;
     my $filename = shift;
     my $parentFilters = shift;
     my $parentLoadFromRefs = shift;
@@ -305,11 +307,20 @@ sub loadFile
 
     # First file is root ($root defined at end of first file processing)
     my $isRoot = !$root;
+    
+    # Set up error message
+    my $errormsg = '';
+    if ($fromFilename) {
+        $errormsg .= "In \"$fromFilename\"";
+        $errormsg .= " at line $fromLinenum" if $fromLinenum;
+        $errormsg .= ': ';
+    }
+    $errormsg .= "Error loading \"$filename\"";
 
     # Head, Tail, and Extension Processing
     my ($filepath, $head, $middle, $tail, $ext) = $filename =~ /^(.*\/)?(.*\+)?(.*?)(~.*)?\.([^.]+)$/;
-    die "Invalid filename (missing extension): $filename\n" unless defined $ext;
-    die "Invalid filename (missing main body): $filename\n" unless defined $middle;
+    die "$errormsg: invalid filename: missing filename extension\n" unless defined $ext;
+    die "$errormsg: invalid filename: missing main body\n" unless defined $middle;
 
     my $searchPartialPaths = $middle =~ /\^$/; #$psr
     if ($searchPartialPaths) {
@@ -324,7 +335,7 @@ sub loadFile
     
     # Name is last string in path
     my ($name) = $middle =~ /([^^]+)$/; #$psr
-    die "Invalid filename: $filename\n" unless defined $name;
+    die "$errormsg: invalid filename: no name component\n" unless defined $name;
     
     # Determine ID from $middle
     my $id;
@@ -353,21 +364,24 @@ sub loadFile
     }
 
     # Begin file operations
+    my $linenum = 0;
     my $prefix;
     my $title;
     my @syscmds;
     my %sysvars;
     my %uservars;
-    open (my $fh, '<', $filename) or die "Can't open $filename: $!\n";
+    open (my $fh, '<', $filename) or die "$errormsg: file open error: $!\n";
     
     # Obtain information from first line of file
     if (defined($_ = <$fh>)) {
-        if (!readProperties(\@syscmds, \%sysvars, \%uservars, $fh, $_)) {
+        ++$linenum;
+        if (!readProperties(\@syscmds, \%sysvars, \%uservars, \$linenum, $fh, $_)) {
             ($prefix, $title) = /^(#+)\s*(.*?)\s*$/;
 
             # Check second line of file for properties section
             if (defined($_ = <$fh>)) {
-                readProperties(\@syscmds, \%sysvars, \%uservars, $fh, $_);
+                ++$linenum;
+                readProperties(\@syscmds, \%sysvars, \%uservars, \$linenum, $fh, $_);
             }
         }
     }
@@ -393,7 +407,8 @@ sub loadFile
     my @refdFilesToLoad;
     if (keys %$loadFromRefs) {
         while (<$fh>) {
-            addRefdFilesToLoad($_, $loadFromRefs, \@refdFilesToLoad);
+            ++$linenum;
+            addRefdFilesToLoad($filename, $linenum, $_, $loadFromRefs, \@refdFilesToLoad);
         }
     }
 
@@ -438,13 +453,13 @@ sub loadFile
     
     # Anchor must be unique: ignore the file if it matches an existing anchor;
     if (exists $fileForAnchor{$anchor}) {
-        print STDERR "Ignoring \"$filename\": duplicate anchor (internal link target)\n";
+        print STDERR "Ignoring load request for \"$filename\": duplicate anchor (internal link target)\n";
         #return $fileForAnchor{$anchor};
         return;
     }
     
     # Make sure ID is unique (should have been caught with anchor test above)
-    die "Duplicate ID: $id\n" if exists $fileForId{$id};
+    die "$errormsg: duplicate ID: $id\n" if exists $fileForId{$id};
     
     # Bundle information about file in hash
     my %file;
@@ -545,7 +560,7 @@ sub connectFile
         elsif ($cmd eq 'child' || $cmd eq 'load') {
             my @files;
             foreach my $filename (glob $arg) {
-                my $file = loadFile($filename, $filters, $loadFromRefs, $splitsForRefs);
+                my $file = loadFile('', 0, $filename, $filters, $loadFromRefs, $splitsForRefs);
                 push @files, $file if defined $file;
             }
             my $title = '';
@@ -572,10 +587,11 @@ sub connectFile
     $$file{children} = \@children if @children;
     
     # Load referenced files
-    foreach my $refdFile (@{$refdFilesToLoad}) {
+    foreach my $refdFileInfo (@{$refdFilesToLoad}) {
         #print STDERR "Loading $refdFile\n";
+        my $refdFile = $$refdFileInfo{refFilename};
         my $lcRefdFile = lc($refdFile);
-        my $file = exists $$splitsForRefs{$lcRefdFile} ? $$splitsForRefs{$lcRefdFile} : loadFile($refdFile, $filters, $loadFromRefs, $splitsForRefs);
+        my $file = exists $$splitsForRefs{$lcRefdFile} ? $$splitsForRefs{$lcRefdFile} : loadFile($$refdFileInfo{fromFilename}, $$refdFileInfo{fromLinenum}, $refdFile, $filters, $loadFromRefs, $splitsForRefs);
         connectFile($file, $filters) if defined $file;
     }
 }
@@ -661,11 +677,13 @@ sub readProperties
     my $syscmds = shift;
     my $sysvars = shift;
     my $uservars = shift;
+    my $linenum = shift;
     my $fh = shift;
     my $line = shift;
     if ($line =~ /^<!--\s*$/) { #$pbr
         my $lastSyscmd;
         while (<$fh>) {
+            ++$$linenum;
             last if (/^-->\s*$/); #$per
             next if (/^\s*$/);
             if (/^\s{0,3}([*+])\s+(.*?)\s*:\s+(.*?)\s*$/) {
@@ -695,6 +713,8 @@ sub readProperties
 
 sub addRefdFilesToLoad
 {
+    my $filename = shift;
+    my $linenum = shift;
     my $line = shift;
     my $loadFromRefs = shift;
     my $refdFilesToLoad = shift;
@@ -702,11 +722,13 @@ sub addRefdFilesToLoad
         my $char = $1;
         my $body = $2;
         if ($char eq '@') {
-            open (my $fh, '<', $body) or die "Can't open include file $body: $!\n";
+            open (my $fh, '<', $body) or die "Error in \"$filename\" at line $linenum: can't open include file \"$body\": $!\n";
             if (defined $fh) {
                 my $includedOutput;
+                my $ilinenum = 0;
                 while (my $iline = <$fh>) {
-                    addRefdFilesToLoad($iline, $loadFromRefs, $refdFilesToLoad);
+                    ++$ilinenum;
+                    addRefdFilesToLoad($body, $ilinenum, $iline, $loadFromRefs, $refdFilesToLoad);
                 }
                 close $fh;
             }
@@ -719,8 +741,13 @@ sub addRefdFilesToLoad
                 #print STDERR "Name to load: $name\n";
                 if (exists $$loadFromRefs{$path}) {
                     my $template = $$loadFromRefs{$path};
-                    my $refFileName = $template =~ s/\*/$name/r;
-                    push @$refdFilesToLoad, $refFileName;
+                    my $refFilename = $template =~ s/\*/$name/r;
+                    my %ref = (
+                        fromFilename => $filename,
+                        fromLinenum => $linenum,
+                        refFilename => $refFilename,
+                    );
+                    push @$refdFilesToLoad, \%ref;
                     #print STDERR "Ref to load: $refFileName\n";
                 }
             }
@@ -736,7 +763,9 @@ sub splitFileForRefs
     my $splitsForRefs = shift;
     my $file;
     open (my $fh, '<', $filename) or die "Can't open $filename: $!\n";
+    my $linenum = 0;
     while (<$fh>) {
+        ++$linenum;
         if (/<(["'])(.+?)\1>/) {
             my $char = $1;
             my $body = $2;
@@ -773,12 +802,12 @@ sub splitFileForRefs
                     refdFilesToLoad => [],
                     splitsForRefs => $splitsForRefs,
                 };
-                addRefdFilesToLoad($_, $loadFromRefs, $$file{refdFilesToLoad});
+                addRefdFilesToLoad($filename, $linenum, $_, $loadFromRefs, $$file{refdFilesToLoad});
             }
         }
         elsif (defined $file) {
             push @{$$file{lines}}, $_;
-            addRefdFilesToLoad($_, $loadFromRefs, $$file{refdFilesToLoad});
+            addRefdFilesToLoad($filename, $linenum, $_, $loadFromRefs, $$file{refdFilesToLoad});
         }
     }
     if (defined $file) {
