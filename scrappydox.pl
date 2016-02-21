@@ -198,17 +198,41 @@ Colors the enclosed text green.
 
 Colors the enclosed text blue.
 
-=item <{P}text{P}>
+=item <{e}text{e}>
 
-Sets the background of the enclosed text to pink.
+Colors the enclosed text earth (brown).
+
+=item <{R}text{R}>
+
+Sets the background of the enclosed text to red (pink).
+
+=item <{G}text{G}>
+
+Sets the background of the enclosed text to green.
+
+=item <{B}text{B}>
+
+Sets the background of the enclosed text to blue.
+
+=item <{E}text{E}>
+
+Sets the background of the enclosed text to earth (brown).
 
 =item <{Y}text{Y}>
 
 Sets the background of the enclosed text to yellow.
 
-=item <{B}text{B}>
+=item <{_}text{_}>
 
-Sets the background of the enclosed text to blue.
+Sets the enclosed text to emphasized (italic) font.
+
+=item <{*}text{*}>
+
+Sets the enclosed text to strong (bold) font.
+
+=item <{`}text{`}>
+
+Sets the enclosed text to code (fixed-width) font.
 
 =item <{-}text{-}>
 
@@ -1040,7 +1064,7 @@ sub procShorthand
 {
     my $file = shift;
     my $bodyref = shift;
-    $$bodyref =~ s/<([@"'#*+]|\{[rgbPYB-]\})(.+?)\1>/proc($file, $1, $2)/eg;
+    $$bodyref =~ s/<([@"'#*+]|\{[rgbeRGBEY_*`-]\})(.+?)\1>/proc($file, $1, $2)/eg;
 }
 
 sub procVarShorthand
@@ -1139,17 +1163,41 @@ sub proc
         procShorthand($file, \$body);
         return "<span style=\"color: blue\">$body</span>";
     }
-    if ($char eq '{P}') { # Pink background color
+    if ($char eq '{e}') { # Brown (earth) foreground font
+        procShorthand($file, \$body);
+        return "<span style=\"color: brown\">$body</span>";
+    }
+    if ($char eq '{R}') { # Red background color
         procShorthand($file, \$body);
         return "<span style=\"background-color: pink\">$body</span>";
+    }
+    if ($char eq '{G}') { # Green background color
+        procShorthand($file, \$body);
+        return "<span style=\"background-color: PaleGreen\">$body</span>";
+    }
+    if ($char eq '{B}') { # Blue background color
+        procShorthand($file, \$body);
+        return "<span style=\"background-color: aqua\">$body</span>";
+    }
+    if ($char eq '{E}') { # Brown (earth) background color
+        procShorthand($file, \$body);
+        return "<span style=\"background-color: tan\">$body</span>";
     }
     if ($char eq '{Y}') { # Yellow background color
         procShorthand($file, \$body);
         return "<span style=\"background-color: yellow\">$body</span>";
     }
-    if ($char eq '{B}') { # Blue background color
+    if ($char eq '{_}') { # Emphasized text
         procShorthand($file, \$body);
-        return "<span style=\"background-color: aqua\">$body</span>";
+        return "<em>$body</em>";
+    }
+    if ($char eq '{*}') { # Strong text
+        procShorthand($file, \$body);
+        return "<strong>$body</strong>";
+    }
+    if ($char eq '{`}') { # Code text
+        procShorthand($file, \$body);
+        return "<code>$body</code>";
     }
     if ($char eq '{-}') { # Sriked-out text
         procShorthand($file, \$body);

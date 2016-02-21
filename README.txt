@@ -253,11 +253,25 @@ DESCRIPTION
 
     <{b}text{b}>        Colors the enclosed text blue.
 
-    <{P}text{P}>        Sets the background of the enclosed text to pink.
+    <{e}text{e}>        Colors the enclosed text earth (brown).
+
+    <{R}text{R}>        Sets the background of the enclosed text to red
+                        (pink).
+
+    <{G}text{G}>        Sets the background of the enclosed text to green.
+
+    <{B}text{B}>        Sets the background of the enclosed text to blue.
+
+    <{E}text{E}>        Sets the background of the enclosed text to earth
+                        (brown).
 
     <{Y}text{Y}>        Sets the background of the enclosed text to yellow.
 
-    <{B}text{B}>        Sets the background of the enclosed text to blue.
+    <{_}text{_}>        Sets the enclosed text to emphasized (italic) font.
+
+    <{*}text{*}>        Sets the enclosed text to strong (bold) font.
+
+    <{`}text{`}>        Sets the enclosed text to code (fixed-width) font.
 
     <{-}text{-}>        Sets the enclosed text to strikethrough font.
 
