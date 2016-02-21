@@ -267,13 +267,16 @@ DESCRIPTION
 
     <{Y}text{Y}>        Sets the background of the enclosed text to yellow.
 
-    <{_}text{_}>        Sets the enclosed text to emphasized (italic) font.
+    <{*}text{*}>        Sets the enclosed text to bold font-weight.
 
-    <{*}text{*}>        Sets the enclosed text to strong (bold) font.
+    <{/}text{/}>        Sets the enclosed text to italic font-style.
+
+    <{_}text{_}>        Sets the enclosed text to underline text-decoration.
+
+    <{-}text{-}>        Sets the enclosed text to line-through (strike-out)
+                        text-decoration.
 
     <{`}text{`}>        Sets the enclosed text to code (fixed-width) font.
-
-    <{-}text{-}>        Sets the enclosed text to strikethrough font.
 
     Shorthand translation can be turned off for a file by setting the system
     property "process shorthand" to "0" in that file:

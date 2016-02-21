@@ -222,21 +222,25 @@ Sets the background of the enclosed text to earth (brown).
 
 Sets the background of the enclosed text to yellow.
 
-=item <{_}text{_}>
-
-Sets the enclosed text to emphasized (italic) font.
-
 =item <{*}text{*}>
 
-Sets the enclosed text to strong (bold) font.
+Sets the enclosed text to bold font-weight.
+
+=item <{/}text{/}>
+
+Sets the enclosed text to italic font-style.
+
+=item <{_}text{_}>
+
+Sets the enclosed text to underline text-decoration.
+
+=item <{-}text{-}>
+
+Sets the enclosed text to line-through (strike-out) text-decoration.
 
 =item <{`}text{`}>
 
 Sets the enclosed text to code (fixed-width) font.
-
-=item <{-}text{-}>
-
-Sets the enclosed text to strikethrough font.
 
 =back
 
@@ -1064,7 +1068,7 @@ sub procShorthand
 {
     my $file = shift;
     my $bodyref = shift;
-    $$bodyref =~ s/<([@"'#*+]|\{[rgbeRGBEY_*`-]\})(.+?)\1>/proc($file, $1, $2)/eg;
+    $$bodyref =~ s%<([@"'#*+]|\{[rgbeRGBEY*_/`-]\})(.+?)\1>%proc($file, $1, $2)%eg;
 }
 
 sub procVarShorthand
@@ -1187,21 +1191,25 @@ sub proc
         procShorthand($file, \$body);
         return "<span style=\"background-color: yellow\">$body</span>";
     }
-    if ($char eq '{_}') { # Emphasized text
+    if ($char eq '{*}') { # Bold text
         procShorthand($file, \$body);
-        return "<em>$body</em>";
+        return "<span style=\"font-weight: bold\">$body</span>";
     }
-    if ($char eq '{*}') { # Strong text
+    if ($char eq '{/}') { # Italic text
         procShorthand($file, \$body);
-        return "<strong>$body</strong>";
+        return "<span style=\"font-style: italic\">$body</span>";
+    }
+    if ($char eq '{_}') { # Underline text
+        procShorthand($file, \$body);
+        return "<span style=\"text-decoration: underline\">$body</span>";
+    }
+    if ($char eq '{-}') { # Srike-through text
+        procShorthand($file, \$body);
+        return "<span style=\"text-decoration: line-through\">$body</span>";
     }
     if ($char eq '{`}') { # Code text
         procShorthand($file, \$body);
         return "<code>$body</code>";
-    }
-    if ($char eq '{-}') { # Sriked-out text
-        procShorthand($file, \$body);
-        return "<span style=\"text-decoration: line-through\">$body</span>";
     }
     if ($char eq '*') { # System variable
         my $sysvarname = lc $body;
