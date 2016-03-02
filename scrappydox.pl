@@ -436,7 +436,7 @@ sub loadFile
     if (keys %$loadFromRefs) {
         while (<$fh>) {
             ++$linenum;
-            addRefdFilesToLoad($filename, $linenum, $_, $loadFromRefs, \@refdFilesToLoad);
+            addRefdFilesToLoad($filename, $linenum, \%uservars, $_, $loadFromRefs, \@refdFilesToLoad);
         }
     }
 
@@ -743,10 +743,11 @@ sub addRefdFilesToLoad
 {
     my $filename = shift;
     my $linenum = shift;
+    my $uservars = shift;
     my $line = shift;
     my $loadFromRefs = shift;
     my $refdFilesToLoad = shift;
-    while ($line =~ /<([@#])(.+?)\1>/g) {
+    while ($line =~ /<([@#+])(.+?)\1>/g) {
         my $char = $1;
         my $body = $2;
         if ($char eq '@') {
@@ -756,7 +757,7 @@ sub addRefdFilesToLoad
                 my $ilinenum = 0;
                 while (my $iline = <$fh>) {
                     ++$ilinenum;
-                    addRefdFilesToLoad($body, $ilinenum, $iline, $loadFromRefs, $refdFilesToLoad);
+                    addRefdFilesToLoad($body, $ilinenum, $uservars, $iline, $loadFromRefs, $refdFilesToLoad);
                 }
                 close $fh;
             }
@@ -778,6 +779,13 @@ sub addRefdFilesToLoad
                     push @$refdFilesToLoad, \%ref;
                     #print STDERR "Ref to load: $refFileName\n";
                 }
+            }
+        }
+        elsif ($char eq '+') {
+            my $uservarname = lc $body;
+            if (exists $$uservars{$uservarname}) {
+                my $userVarValue = @{$$uservars{$uservarname}}[-1];
+                addRefdFilesToLoad($filename, $linenum, $uservars, $userVarValue, $loadFromRefs, $refdFilesToLoad);
             }
         }
     }
@@ -830,12 +838,12 @@ sub splitFileForRefs
                     refdFilesToLoad => [],
                     splitsForRefs => $splitsForRefs,
                 };
-                addRefdFilesToLoad($filename, $linenum, $_, $loadFromRefs, $$file{refdFilesToLoad});
+                addRefdFilesToLoad($filename, $linenum, $$file{uservars}, $_, $loadFromRefs, $$file{refdFilesToLoad});
             }
         }
         elsif (defined $file) {
             push @{$$file{lines}}, $_;
-            addRefdFilesToLoad($filename, $linenum, $_, $loadFromRefs, $$file{refdFilesToLoad});
+            addRefdFilesToLoad($filename, $linenum, $$file{uservars}, $_, $loadFromRefs, $$file{refdFilesToLoad});
         }
     }
     if (defined $file) {
@@ -1224,7 +1232,9 @@ sub proc
         my $uservarname = lc $body;
         my $uservars = $$file{uservars};
         if (exists $$uservars{$uservarname}) {
-            return @{$$uservars{$uservarname}}[-1];
+            my $userVarValue = @{$$uservars{$uservarname}}[-1];
+            procShorthand($file, \$userVarValue);
+            return $userVarValue;
         }
         # Unrecognized user variable: silently return empty string.
         # Returning empty string supports notion that user variables
