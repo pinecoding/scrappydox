@@ -293,6 +293,24 @@ my $ss = '_'; # Space substitute (in URLs and filenames)
 #my $pbr = qr/^<!--\s*$/; # Begin properties section regex
 #my $per = qr/^-->\s*$/; # End properties section regex
 
+# Global Style Shortcut Translation
+my %styleForChar = (
+    "r" => "color: Red",
+    "g" => "color: Green",
+    "b" => "color: Blue",
+    "e" => "color: Brown", # earth color
+    "R" => "background-color: Pink", # red background
+    "G" => "background-color: PaleGreen", # green background
+    "B" => "background-color: Aqua", # blue background
+    "E" => "background-color: Tan", # earth background
+    "Y" => "background-color: Yellow", # yellow background
+    "*" => "font-weight: bold",
+    "/" => "font-style: italic",
+    "_" => "text-decoration: underline",
+    "-" => "text-decoration: line-through",
+    "`" => "font-family: monospace",
+);
+
 # Global Values
 #my $currDate = dateString ("Datime");
 my $currDate = dateString ("Std");
@@ -1062,10 +1080,51 @@ sub procLine
     # Make sure there is a body
     $body = "" if not $body;
     
+    procTableShorthand(\$body) if not $prefix;
+    
     # Process angle-bracket shorthands
     procShorthand($file, \$body) if $processShorthand;
     
     print $body . "\n";
+}
+
+sub procTableShorthand
+{
+    my $bodyref = shift;
+    my $firstChar = substr($$bodyref, 0, 1);
+    return if $firstChar ne '|';
+    my ($secondChar) = $$bodyref =~ /^\|(\S)\s*$/;
+    if (defined $secondChar) {
+        if ($secondChar eq '=') {
+            $$bodyref = '<table><tr>';
+            return;
+        }
+        if ($secondChar eq '-') {
+            $$bodyref = '</tr><tr>';
+            return;
+        }
+        if ($secondChar eq '_') {
+            $$bodyref = '</tr></table>';
+            return;
+        }
+    }
+    if ($$bodyref =~ /^\|([^#|]*)([#|])/) {
+        my $styleChars = defined $1 ? $1 : '';
+        my $type = $2;
+        my $styles;
+        for my $i (0..length($styleChars)-1) {
+            my $styleChar = substr($styleChars, $i, 1);
+            if (exists $styleForChar{$styleChar}) {
+                my $style = $styleForChar{$styleChar};
+                $styles .= '; ' if $i > 0;
+                $styles .= $style;
+            }
+        }
+        my $styleString = $styles ? " style=\"$styles\"" : '';
+        my $tag = $type eq '#' ? 'th' : 'td';
+        $$bodyref =~ s/^\|[^#|]*[#|](.*)$/<$tag$styleString>$1<\/$tag>/;
+        return;
+    }
 }
 
 sub procShorthand
@@ -1092,6 +1151,7 @@ sub proc
         if (defined $fh) {
             my $includedOutput;
             while (my $line = <$fh>) {
+                procTableShorthand(\$line);
                 procShorthand($file, \$line);
                 $includedOutput .= $line;
             }
@@ -1159,61 +1219,13 @@ sub proc
         }
         return "<a href=\"#$url\">$display</a>";
     }
-    if ($char eq '{r}') { # Red foreground font
-        procShorthand($file, \$body);
-        return "<span style=\"color: red\">$body</span>";
-    }
-    if ($char eq '{g}') { # Green foreground font
-        procShorthand($file, \$body);
-        return "<span style=\"color: green\">$body</span>";
-    }
-    if ($char eq '{b}') { # Blue foreground font
-        procShorthand($file, \$body);
-        return "<span style=\"color: blue\">$body</span>";
-    }
-    if ($char eq '{e}') { # Brown (earth) foreground font
-        procShorthand($file, \$body);
-        return "<span style=\"color: brown\">$body</span>";
-    }
-    if ($char eq '{R}') { # Red background color
-        procShorthand($file, \$body);
-        return "<span style=\"background-color: pink\">$body</span>";
-    }
-    if ($char eq '{G}') { # Green background color
-        procShorthand($file, \$body);
-        return "<span style=\"background-color: PaleGreen\">$body</span>";
-    }
-    if ($char eq '{B}') { # Blue background color
-        procShorthand($file, \$body);
-        return "<span style=\"background-color: aqua\">$body</span>";
-    }
-    if ($char eq '{E}') { # Brown (earth) background color
-        procShorthand($file, \$body);
-        return "<span style=\"background-color: tan\">$body</span>";
-    }
-    if ($char eq '{Y}') { # Yellow background color
-        procShorthand($file, \$body);
-        return "<span style=\"background-color: yellow\">$body</span>";
-    }
-    if ($char eq '{*}') { # Bold text
-        procShorthand($file, \$body);
-        return "<span style=\"font-weight: bold\">$body</span>";
-    }
-    if ($char eq '{/}') { # Italic text
-        procShorthand($file, \$body);
-        return "<span style=\"font-style: italic\">$body</span>";
-    }
-    if ($char eq '{_}') { # Underline text
-        procShorthand($file, \$body);
-        return "<span style=\"text-decoration: underline\">$body</span>";
-    }
-    if ($char eq '{-}') { # Srike-through text
-        procShorthand($file, \$body);
-        return "<span style=\"text-decoration: line-through\">$body</span>";
-    }
-    if ($char eq '{`}') { # Code text
-        procShorthand($file, \$body);
-        return "<code>$body</code>";
+    if ($char =~ /^\{(.)\}$/) {
+        my $styleChar = $1;
+        if (exists $styleForChar{$styleChar}) {
+            procShorthand($file, \$body);
+            my $style = $styleForChar{$styleChar};
+            return "<span style=\"$style\">$body</span>";
+        }
     }
     if ($char eq '*') { # System variable
         my $sysvarname = lc $body;
