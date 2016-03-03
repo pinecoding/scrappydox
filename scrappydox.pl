@@ -308,15 +308,16 @@ my %fileForAnchor;
 my %rootFilters;
 my %rootLoadFromRefs;
 my %rootSplitsForRefs;
+my %rootUservars;
 
 # Find the root and file basics
 foreach my $filename (@ARGV) {
-    my $file = loadFile('', 0, $filename, \%rootFilters, \%rootLoadFromRefs, \%rootSplitsForRefs);
+    my $file = loadFile('', 0, $filename, \%rootFilters, \%rootLoadFromRefs, \%rootSplitsForRefs, \%rootUservars);
     connectFile($file, \%rootFilters) if defined $file;
 }
 
 # Build a tree from paths
-addChildren ($root, $$root{id}, $$root{isysvars}, $$root{iuservars});
+addChildren ($root, $$root{id}, $$root{isysvars});
 #processTree ($root, 0, \&printFileWithIndent);
 processTree ($root, 0, \&processFile);
 
@@ -328,6 +329,7 @@ sub loadFile
     my $parentFilters = shift;
     my $parentLoadFromRefs = shift;
     my $parentSplitsForRefs = shift;
+    my $parentUservars = shift;
 
     # No need to reprocess filename that has been seen before
     return if exists $fileForFilename{$filename};
@@ -397,19 +399,19 @@ sub loadFile
     my $title;
     my @syscmds;
     my %sysvars;
-    my %uservars;
+    my $uservars = $isRoot ? $parentUservars : {%$parentUservars};
     open (my $fh, '<', $filename) or die "$errormsg: file open error: $!\n";
     
     # Obtain information from first line of file
     if (defined($_ = <$fh>)) {
         ++$linenum;
-        if (!readProperties(\@syscmds, \%sysvars, \%uservars, \$linenum, $fh, $_)) {
+        if (!readProperties(\@syscmds, \%sysvars, $uservars, \$linenum, $fh, $_)) {
             ($prefix, $title) = /^(#+)\s*(.*?)\s*$/;
 
             # Check second line of file for properties section
             if (defined($_ = <$fh>)) {
                 ++$linenum;
-                readProperties(\@syscmds, \%sysvars, \%uservars, \$linenum, $fh, $_);
+                readProperties(\@syscmds, \%sysvars, $uservars, \$linenum, $fh, $_);
             }
         }
     }
@@ -436,7 +438,7 @@ sub loadFile
     if (keys %$loadFromRefs) {
         while (<$fh>) {
             ++$linenum;
-            addRefdFilesToLoad($filename, $linenum, \%uservars, $_, $loadFromRefs, \@refdFilesToLoad);
+            addRefdFilesToLoad($filename, $linenum, $uservars, $_, $loadFromRefs, \@refdFilesToLoad);
         }
     }
 
@@ -456,7 +458,7 @@ sub loadFile
     }
     
     # Apply filters
-    foreach my $uservarname (keys %uservars) {
+    foreach my $uservarname (keys %$uservars) {
         if (exists $$parentFilters{$uservarname}) {
             my $hasChoices = 0;
             my $foundTrue = 0;
@@ -466,7 +468,7 @@ sub loadFile
                 my $isChoose = $$filter{isChoose};
                 my $isExclude = $$filter{isExclude};
                 $hasChoices = 1 if $isChoose;
-                foreach my $userval (@{$uservars{$uservarname}}) {
+                foreach my $userval (@{$$uservars{$uservarname}}) {
                     if (boolEval($userval, $op, $val)) {
                         if ($isExclude) {
                             return;
@@ -504,8 +506,7 @@ sub loadFile
     $file{syscmds} = \@syscmds;
     $file{sysvars} = \%sysvars;
     $file{isysvars} = \%sysvars if $isRoot; # Inherited sysvars
-    $file{uservars} = \%uservars;
-    $file{iuservars} = \%uservars if $isRoot; # Inherited uservars
+    $file{uservars} = $uservars;
     $file{path} = $path;
     $file{loadFromRefs} = $loadFromRefs;
     $file{refdFilesToLoad} = \@refdFilesToLoad;
@@ -541,6 +542,7 @@ sub connectFile
     my $loadFromRefs = $$file{loadFromRefs};
     my $refdFilesToLoad = $$file{refdFilesToLoad};
     my $splitsForRefs = $$file{splitsForRefs};
+    my $uservars = $$file{uservars};
     #printf STDERR "Connecting $$file{filename} $path\n";
     
     # Add to filesAtPath
@@ -588,7 +590,7 @@ sub connectFile
         elsif ($cmd eq 'child' || $cmd eq 'load') {
             my @files;
             foreach my $filename (glob $arg) {
-                my $file = loadFile('', 0, $filename, $filters, $loadFromRefs, $splitsForRefs);
+                my $file = loadFile('', 0, $filename, $filters, $loadFromRefs, $splitsForRefs, $uservars);
                 push @files, $file if defined $file;
             }
             my $title = '';
@@ -600,7 +602,7 @@ sub connectFile
                     @files = reverse @files;
                 }
                 elsif ($switch =~ /^sort\s*:\s+(ascending|descending)\s+(alpha|numeric)\s+(on|using)\s+(.+)$/i) {
-                    @files = sortFiles(\@files, lc $1 eq 'ascending', lc $2 eq 'alpha', lc $3 eq 'on', lc $4);
+                    @files = sortFiles($file, \@files, lc $1 eq 'ascending', lc $2 eq 'alpha', lc $3 eq 'on', lc $4);
                 }
             }
             foreach my $file (@files) {
@@ -619,13 +621,14 @@ sub connectFile
         #print STDERR "Loading $refdFile\n";
         my $refdFile = $$refdFileInfo{refFilename};
         my $lcRefdFile = lc($refdFile);
-        my $file = exists $$splitsForRefs{$lcRefdFile} ? $$splitsForRefs{$lcRefdFile} : loadFile($$refdFileInfo{fromFilename}, $$refdFileInfo{fromLinenum}, $refdFile, $filters, $loadFromRefs, $splitsForRefs);
+        my $file = exists $$splitsForRefs{$lcRefdFile} ? $$splitsForRefs{$lcRefdFile} : loadFile($$refdFileInfo{fromFilename}, $$refdFileInfo{fromLinenum}, $refdFile, $filters, $loadFromRefs, $splitsForRefs, $uservars);
         connectFile($file, $filters) if defined $file;
     }
 }
 
 sub sortFiles
 {
+    my $file = shift;
     my $files = shift;
     my $isAscending = shift;
     my $isAlpha = shift;
@@ -641,7 +644,7 @@ sub sortFiles
             $sortByTitle = 1;
         }
         else {
-            next;
+            die "In \"$$file{filename}\": Error: invalid system sort field: $field\n"
         }
     }
     foreach my $file (@{$files}) {
@@ -655,8 +658,8 @@ sub sortFiles
         else {
             my $uservars = $$file{uservars};
             if (exists $$uservars{$field}) {
-                # First key is probably main one
-                $sortkey = $$uservars{$field}[0];
+                # Last key is at bottom of inheritance tree
+                $sortkey = $$uservars{$field}[-1];
             }
             else {
                 $sortkey = "";
@@ -861,27 +864,20 @@ sub addChildren
     my $file = shift;
     my $fullPath = shift;
     my $psysvars = shift; # Parent sysvars
-    my $puservars = shift; # Parent sysvars
     
     # Determine and save the inherited sysvars
     my %isysvars = %{$psysvars};
     my $sysvars = $$file{sysvars};
     @isysvars{keys %{$sysvars}} = values %{$sysvars};
     $$file{isysvars} = \%isysvars;
-    
-    # Determine and save the inherited uservars
-    my %iuservars = %{$puservars};
-    my $uservars = $$file{uservars};
-    @iuservars{keys %{$uservars}} = values %{$uservars};
-    $$file{iuservars} = \%iuservars;
-    
+        
     # Save fullPath
     $$file{fullPath} = $fullPath;
     
     # Process explicit children
     if (exists $$file{children}) {
         foreach my $child (@{$$file{children}}) {
-            addChildren ($child, $fullPath . $ps . $$child{name}, \%isysvars, \%iuservars);
+            addChildren ($child, $fullPath . $ps . $$child{name}, \%isysvars);
         }
     }
     else {
@@ -892,7 +888,7 @@ sub addChildren
                 my $files = $filesAtPath{$searchPath};
                 push @children, @{$files};
                 foreach my $child (@{$files}) {
-                    addChildren ($child, $fullPath . $ps . $$child{name}, \%isysvars, \%iuservars);
+                    addChildren ($child, $fullPath . $ps . $$child{name}, \%isysvars);
                 }
             }
             $searchPath =~ s/[^^]*\^?//; #$psr
@@ -905,7 +901,7 @@ sub addChildren
                 push @children, @{$files};
                 foreach my $child (@{$files}) {
                     my $childFullPath = $fullPath . ($$child{id} =~ s/^[^^]+//r); #$psr
-                    addChildren ($child, $childFullPath, \%isysvars, \%iuservars);
+                    addChildren ($child, $childFullPath, \%isysvars);
                 }
             }
         }
@@ -926,7 +922,7 @@ sub addChildren
                     @files = reverse @files;
                 }
                 elsif ($sort =~ /^(ascending|descending)\s+(alpha|numeric)\s+(on|using)\s+(.+)$/i) {
-                    @files = sortFiles(\@files, lc $1 eq 'ascending', lc $2 eq 'alpha', lc $3 eq 'on', lc $4);
+                    @files = sortFiles($file, \@files, lc $1 eq 'ascending', lc $2 eq 'alpha', lc $3 eq 'on', lc $4);
                 }
             }
             $$file{children} = \@files;
