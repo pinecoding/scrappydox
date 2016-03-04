@@ -1108,7 +1108,7 @@ sub procTableShorthand
             return;
         }
     }
-    if ($$bodyref =~ /^\|([^#|]*)([#|])/) {
+    if ($$bodyref =~ /^\|([^#>|]*)([#>|])/) {
         my $styleChars = defined $1 ? $1 : '';
         my $type = $2;
         my $styles;
@@ -1122,7 +1122,9 @@ sub procTableShorthand
         }
         my $styleString = $styles ? " style=\"$styles\"" : '';
         my $tag = $type eq '#' ? 'th' : 'td';
-        $$bodyref =~ s/^\|[^#|]*[#|](.*)$/<$tag$styleString>$1<\/$tag>/;
+        my $startTag = "<$tag$styleString>";
+        my $endTag = $type eq '>' ? '' : "</$tag>";
+        $$bodyref =~ s/^\|[^#>|]*[#>|](.*)$/$startTag$1$endTag/;
         return;
     }
 }
