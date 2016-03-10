@@ -323,6 +323,7 @@ my %filesAtPartialPath;
 my %fileForFilename;
 my %fileForId;
 my %fileForAnchor;
+my %titleForAnchor;
 my %rootFilters;
 my %rootLoadFromRefs;
 my %rootSplitsForRefs;
@@ -453,11 +454,13 @@ sub loadFile
     
     # Process post-header contents based on loadFromRefs
     my @refdFilesToLoad;
-    if (keys %$loadFromRefs) {
-        while (<$fh>) {
-            ++$linenum;
-            addRefdFilesToLoad($filename, $linenum, $uservars, $_, $loadFromRefs, \@refdFilesToLoad);
-        }
+ 
+    # While loop should be in "if (keys %$loadFromRefs)",
+    # except that now all anchors are parsed as well to check
+    # for anchor titles.
+    while (<$fh>) {
+        ++$linenum;
+        addRefdFilesToLoad($filename, $linenum, $uservars, $_, $loadFromRefs, \@refdFilesToLoad);
     }
 
     # End file operations
@@ -768,7 +771,7 @@ sub addRefdFilesToLoad
     my $line = shift;
     my $loadFromRefs = shift;
     my $refdFilesToLoad = shift;
-    while ($line =~ /<([@#+])(.+?)\1>/g) {
+    while ($line =~ /<([@#+'"])(.+?)\1>/g) {
         my $char = $1;
         my $body = $2;
         if ($char eq '@') {
@@ -808,6 +811,11 @@ sub addRefdFilesToLoad
                 my $userVarValue = @{$$uservars{$uservarname}}[-1];
                 addRefdFilesToLoad($filename, $linenum, $uservars, $userVarValue, $loadFromRefs, $refdFilesToLoad);
             }
+        }
+        elsif ($char eq "'" || $char eq '"') {
+            # Add-on, not related to refs, for adding titles to anchors
+            my ($rawAnchor, $title) = splitAnchorAndTitle($body);
+            $titleForAnchor{$rawAnchor} = $title if $title;
         }
     }
 }
@@ -1164,6 +1172,7 @@ sub proc
     }
     if ($char eq '"' or $char eq "'") { # Anchor
         my $display;
+        my $title;
         my $url;
         if ($body eq $ii) {
             # Anchor is the file anchor (based on ID)
@@ -1180,37 +1189,55 @@ sub proc
         else {
             # Anchor is a regular path
             procVarShorthand($file, \$body);
-            my @pathParts = split /\^/, $body; #$psr
+            
+            # Logic to process title addendum
+            my $rawAnchor;
+            ($rawAnchor, $title) = splitAnchorAndTitle($body);
+            
+            my @pathParts = split /\^/, $rawAnchor; #$psr
             $display = (split /\+/, $pathParts[-1])[-1] =~ s/$ss/ /gr; #$dsr
             if (!$pathParts[0]) {
                 # Starts with path separator:
                 # In-file nested anchor
-                $url = $$file{anchor} . an($body);
+                $url = $$file{anchor} . an($rawAnchor);
             }
             else {
                 # Doesn't start with path separator
                 # Anchor is standard non-nested anchor
-                $url = an($body);
+                $url = an($rawAnchor);
             }
         }
         $display = '' if $char eq "'";
+        if ($title) {
+            if ($display) {
+                $display = $display . ': ' . $title;
+            }
+            else {
+                $display = $title;
+            }
+        }
         return "<span id=\"$url\">$display<\/span>";
     }
     if ($char eq '#') { # Link
         procVarShorthand($file, \$body);
-        my @pathParts = split /\^/, $body; #$psr
+
+        # Logic to process titleSpec addendum
+        my ($rawAnchor, $titleSpec) = splitAnchorAndTitleSpec($body);
+        my $title = ($titleSpec && exists $titleForAnchor{$rawAnchor}) ? $titleForAnchor{$rawAnchor} : '';
+
+        my @pathParts = split /\^/, $rawAnchor; #$psr
         my $display = (split /\+/, $pathParts[-1])[-1] =~ s/$ss/ /gr; #$dsr
         my $url;
         #print STDERR $char . ' ' . $display . "\n";
         if (!$pathParts[0]) {
             # Starts with path separator:
             # In-file nested link
-            $url = $$file{anchor} .  an($body);
+            $url = $$file{anchor} .  an($rawAnchor);
         }
         else {
             # Doesn't start with path separator
             # Non-nested link
-            $url = an($body);
+            $url = an($rawAnchor);
             if (exists $fileForAnchor{$url}) {
                 my $title = ${$fileForAnchor{$url}}{title};
                 # To preserve case of link, only use title if more than case is different
@@ -1219,7 +1246,22 @@ sub proc
                 }
             }
         }
-        return "<a href=\"#$url\">$display</a>";
+        my $html;
+        if ($title) {
+            if ($titleSpec eq '""') {
+                $html = "<a href=\"#$url\">$title</a>";
+            }
+            elsif ($titleSpec eq '"""') {
+                $html = "$title";
+            }
+            else {
+                $html = "<a href=\"#$url\">$display: $title</a>";
+            }
+        }
+        else {
+            $html = "<a href=\"#$url\">$display</a>";
+        }
+        return $html;
     }
     if ($char =~ /^\{(.)\}$/) {
         my $styleChar = $1;
@@ -1253,6 +1295,24 @@ sub proc
     }
     # Unrecognized shorthand: return original string
     return "<$char$body$char>";
+}
+
+sub splitAnchorAndTitle
+{
+    my $body = shift;
+    my ($anchor, $title) = $body =~ /^([^"]+)"?(.*)$/;
+    $anchor = $body if not defined $anchor;
+    $title = '' if not defined $title;
+    return ($anchor, $title);
+}
+
+sub splitAnchorAndTitleSpec
+{
+    my $body = shift;
+    my ($anchor, $titleSpec) = $body =~ /^([^"]+)("{0,3})$/;
+    $anchor = $body if not defined $anchor;
+    $titleSpec = '' if not defined $titleSpec;
+    return ($anchor, $titleSpec);
 }
 
 sub addToHash
