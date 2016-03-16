@@ -8,7 +8,28 @@ DESCRIPTION
     Scrappydox builds a markdown document out of multiple markdown files,
     starting from [ROOT FILE] as the main, top-level, section.
 
-    [OTHER FILES] are handled in two different ways:
+    Usually only the [ROOT FILE] is specified, and the [ROOT FILE] itself
+    specifies files to load as subsections using "Child" commands. These
+    "Child" commands, which may contain wildcard specifiers, are placed in
+    an HTML comment block after the title line, e.g.:
+
+        # Mission Trails
+        <!--
+        * Child: Announcements.txt
+        * Child: Stories*.txt
+        -->
+
+    If [OTHER FILES] are specified, the [ROOT FILE] needs a "Child Match"
+    command in order to for it to look for and try to match these files into
+    a document hierarchy.
+
+        # Mission Trails
+        <!--
+        * Child Match
+        -->
+
+    With the "Child Match" command in place, [OTHER FILES] are matched in
+    two different ways:
 
     -   If a filename does not contain caret path-separator characters, then
         it is added as a subsection of [ROOT FILE], in the order
@@ -47,12 +68,11 @@ DESCRIPTION
 
         01+Geology~Mission_Trails.txt
 
-    An HTML comment block at the top of the docment, or after the title line
-    (first line) can be used to specify commands for loading additional
-    files, and for the definition of user variables used for sorting and
-    filtering of the files loaded. Following is an example of a root
-    document specifying the remainder of the document, so that [OTHER FILES]
-    are not needed:
+    The HTML comment block after the title line supports additional commands
+    for loading files, and for the definition of user variables used for
+    sorting and filtering of the files loaded. Following is an example of a
+    more complex [ROOT FILE] that fully specifies the remainder of the
+    document, such that [OTHER FILES] are not needed:
 
         # Mission Trails
         <!--
@@ -83,9 +103,10 @@ DESCRIPTION
 
     Each "Child" command loads a file as a child section, or files as child
     sections (if wildcards are used). Each "Load" command loads files for
-    path matching, where each file must have a path that matches a filename
-    in the document in order to be included as a subsection under the
-    matched filename.
+    caret path matching, as described for [OTHER FILES] above. In order to
+    be included in the document, files loaded for path matching must match a
+    file that has already been placed into the document hierarchy and that
+    contains a "Child Match" command in its HTML comment block.
 
     "Child" and "Load" commands can include a title modifier as a subbullet
     that begins with a dash. For each file, the resulting section title

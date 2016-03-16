@@ -14,7 +14,22 @@ scrappydox [ROOT FILE] [OTHER FILES]...
 
 Scrappydox builds a markdown document out of multiple markdown files, starting from [ROOT FILE] as the main, top-level, section.
 
-[OTHER FILES] are handled in two different ways:
+Usually only the [ROOT FILE] is specified, and the [ROOT FILE] itself specifies files to load as subsections using "Child" commands. These "Child" commands, which may contain wildcard specifiers, are placed in an HTML comment block after the title line, e.g.:
+
+    # Mission Trails
+    <!--
+    * Child: Announcements.txt
+    * Child: Stories*.txt
+    -->
+
+If [OTHER FILES] are specified, the [ROOT FILE] needs a "Child Match" command in order to for it to look for and try to match these files into a document hierarchy.
+
+    # Mission Trails
+    <!--
+    * Child Match
+    -->
+
+With the "Child Match" command in place, [OTHER FILES] are matched in two different ways:
 
 =over 4
 
@@ -46,7 +61,7 @@ Optional head and tail components can be added to filenames to enforce sorting o
 
     01+Geology~Mission_Trails.txt
 
-An HTML comment block at the top of the docment, or after the title line (first line) can be used to specify commands for loading additional files, and for the definition of user variables used for sorting and filtering of the files loaded. Following is an example of a root document specifying the remainder of the document, so that [OTHER FILES] are not needed:
+The HTML comment block after the title line supports additional commands for loading files, and for the definition of user variables used for sorting and filtering of the files loaded. Following is an example of a more complex [ROOT FILE] that fully specifies the remainder of the document, such that [OTHER FILES] are not needed:
 
     # Mission Trails
     <!--
@@ -73,7 +88,7 @@ An HTML comment block at the top of the docment, or after the title line (first 
     
 The HTML comment begin and end indicators must be flush left, and each on its own line, as shown. Commands are prefixed by asterisk bullets, user-defined properties are prefixed by plus-sign bullets.
 
-Each "Child" command loads a file as a child section, or files as child sections (if wildcards are used). Each "Load" command loads files for path matching, where each file must have a path that matches a filename in the document in order to be included as a subsection under the matched filename.
+Each "Child" command loads a file as a child section, or files as child sections (if wildcards are used). Each "Load" command loads files for caret path matching, as described for [OTHER FILES] above. In order to be included in the document, files loaded for path matching must match a file that has already been placed into the document hierarchy and that contains a "Child Match" command in its HTML comment block.
 
 "Child" and "Load" commands can include a title modifier as a subbullet that begins with a dash. For each file, the resulting section title becomes the title in the modifier plus the original title, where the original title replaces the first asterisk (if any) found in the title modifier. This is generally applied to a "Child" command for a single file, to change the title of the resulting child section. That way a file can be reused as-is in multiple documents, where the section title must be appropriate for the containing document.
 
@@ -665,7 +680,7 @@ sub sortFiles
             $sortByTitle = 1;
         }
         else {
-            die "In \"$$file{filename}\": Error: invalid system sort field: $field\n"
+            die "In \"$$file{filename}\": Error: invalid system sort field: \"$field\"\n"
         }
     }
     foreach my $file (@{$files}) {
@@ -738,13 +753,15 @@ sub readProperties
             ++$$linenum;
             last if (/^-->\s*$/); #$per
             next if (/^\s*$/);
-            if (/^\s{0,3}([*+])\s+(.*?)\s*:\s+(.*?)\s*$/) {
+            if (/^\s{0,3}([*+])\s+([^:]+?)(\s*:\s+(.+?))?\s*$/) {
                 my $hash = $1 eq '*' ? $sysvars : $uservars;
-                addToHash($hash, lc($2), $3);
+                my $cmd = lc($2);
+                my $arg = defined $4 ? $4 : '';
+                addToHash($hash, $cmd, $arg);
                 if ($1 eq '*') {
                     my %syscmd = (
-                        'cmd' => lc($2),
-                        'arg' => $3,
+                        'cmd' => $cmd,
+                        'arg' => $arg,
                         'switches' => [],
                     );
                     push @{$syscmds}, \%syscmd;
@@ -891,69 +908,86 @@ sub addChildren
     my $fullPath = shift;
     my $psysvars = shift; # Parent sysvars
     
+    my $sysvars = $$file{sysvars};
+
     # Determine and save the inherited sysvars
     my %isysvars = %{$psysvars};
-    my $sysvars = $$file{sysvars};
     @isysvars{keys %{$sysvars}} = values %{$sysvars};
     $$file{isysvars} = \%isysvars;
         
     # Save fullPath
     $$file{fullPath} = $fullPath;
     
-    # Process explicit children
-    if (exists $$file{children}) {
-        foreach my $child (@{$$file{children}}) {
-            addChildren ($child, $fullPath . $ps . $$child{name}, \%isysvars);
-        }
+    # Make sure have child array
+    $$file{children} = [] if not exists $$file{children};
+    my $children = $$file{children};
+    
+    # Process explicitly loaded children
+    foreach my $child (@{$children}) {
+        addChildren ($child, $fullPath . $ps . $$child{name}, \%isysvars);
     }
-    else {
-        my @children = ();  
+      
+    # Process children that match path
+    if (exists $$sysvars{'child match'}) {
         my $searchPath = $fullPath;
         while ($searchPath) {
             if (exists $filesAtPath{$searchPath}) {
                 my $files = $filesAtPath{$searchPath};
-                push @children, @{$files};
                 foreach my $child (@{$files}) {
-                    addChildren ($child, $fullPath . $ps . $$child{name}, \%isysvars);
+                    if (not refInArray($child, $children)) {
+                        push @{$children}, $child;
+                        #print STDERR "Loading $$file{filename} child $$child{filename}\n";
+                        addChildren ($child, $fullPath . $ps . $$child{name}, \%isysvars);
+                    }
                 }
             }
             $searchPath =~ s/[^^]*\^?//; #$psr
         }
-        if ($$file{searchPartialPaths} && !@children) {
+        if ($$file{searchPartialPaths} && !@{$children}) {
             # Search partial paths
             my $name = $$file{name};
             if (exists $filesAtPartialPath{$name}) {
                 my $files = $filesAtPartialPath{$name};
-                push @children, @{$files};
                 foreach my $child (@{$files}) {
-                    my $childFullPath = $fullPath . ($$child{id} =~ s/^[^^]+//r); #$psr
-                    addChildren ($child, $childFullPath, \%isysvars);
+                    if (not refInArray($child, $children)) {
+                        push @{$children}, $child;
+                        my $childFullPath = $fullPath . ($$child{id} =~ s/^[^^]+//r); #$psr
+                        addChildren ($child, $childFullPath, \%isysvars);
+                    }
                 }
             }
         }
-        $$file{children} = \@children;
-        #foreach my $child (@children) {
+        
+        #foreach my $child (@{$children)) {
         #    print STDERR "$$file{filename} <- $$child{filename} $$child{titlePrefix}\n";
         #}
     }
-    
+            
     # Sort the children
-    if (@{$$file{children}} > 1) {
-        my $sysvars = $$file{sysvars};
-        if (exists $$sysvars{sort}) {
-            my $sorts = $$sysvars{sort};
-            my @files = @{$$file{children}};
-            foreach my $sort (reverse @{$sorts}) {
-                if ($sort =~ /^reverse$/i) {
-                    @files = reverse @files;
-                }
-                elsif ($sort =~ /^(ascending|descending)\s+(alpha|numeric)\s+(on|using)\s+(.+)$/i) {
-                    @files = sortFiles($file, \@files, lc $1 eq 'ascending', lc $2 eq 'alpha', lc $3 eq 'on', lc $4);
-                }
+    return if not @{$children} > 1;
+    if (exists $$sysvars{sort}) {
+        my $sorts = $$sysvars{sort};
+        my @files = @{$children};
+        foreach my $sort (reverse @{$sorts}) {
+            if ($sort =~ /^reverse$/i) {
+                @files = reverse @files;
             }
-            $$file{children} = \@files;
+            elsif ($sort =~ /^(ascending|descending)\s+(alpha|numeric)\s+(on|using)\s+(.+)$/i) {
+                @files = sortFiles($file, \@files, lc $1 eq 'ascending', lc $2 eq 'alpha', lc $3 eq 'on', lc $4);
+            }
         }
+        $$file{children} = \@files;
     }
+}
+
+sub refInArray
+{
+    my $ref = shift;
+    my $array = shift;
+    foreach my $el (@{$array}) {
+        return 1 if $el == $ref;
+    }
+    return 0;
 }
 
 sub processTree
