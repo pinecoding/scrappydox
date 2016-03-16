@@ -530,6 +530,7 @@ sub loadFile
     # Bundle information about file in hash
     my %file;
     $file{isRoot} = $isRoot;
+    $file{isConnected} = 0;
     $file{filename} = $filename;
     $file{head} = $head;
     $file{tail} = $tail;
@@ -573,6 +574,7 @@ sub connectFile
     $connectedFiles{$id} = undef; # undef is lowest footprint value
     
     my $isRoot = $$file{isRoot};
+    my $isConnected = $$file{isConnected};
     my $path = $$file{path};
     my $syscmds = $$file{syscmds};
     my $loadFromRefs = $$file{loadFromRefs};
@@ -581,23 +583,25 @@ sub connectFile
     my $uservars = $$file{uservars};
     #printf STDERR "Connecting $$file{filename} $path\n";
     
-    # Add to filesAtPath
-    if (exists $filesAtPath{$path}) {
-        push @{$filesAtPath{$path}}, $file;
-     }
-    else {
-       $filesAtPath{$path} = [$file];
-    }
-
-    # Add to filesAtPartialPath
-    my ($partialPath) = $path =~ /^([^^]+)\^/; #$psr
-    if ($partialPath) {
-        # print STDERR "Partial path: $partialPath\n";
-        if (exists $filesAtPartialPath{$partialPath}) {
-            push @{$filesAtPartialPath{$partialPath}}, $file;
+    if (not $isConnected) {
+        # Add to filesAtPath
+        if (exists $filesAtPath{$path}) {
+            push @{$filesAtPath{$path}}, $file;
          }
         else {
-           $filesAtPartialPath{$partialPath} = [$file];
+           $filesAtPath{$path} = [$file];
+        }
+
+        # Add to filesAtPartialPath
+        my ($partialPath) = $path =~ /^([^^]+)\^/; #$psr
+        if ($partialPath) {
+            # print STDERR "Partial path: $partialPath\n";
+            if (exists $filesAtPartialPath{$partialPath}) {
+                push @{$filesAtPartialPath{$partialPath}}, $file;
+             }
+            else {
+               $filesAtPartialPath{$partialPath} = [$file];
+            }
         }
     }
     
@@ -645,8 +649,11 @@ sub connectFile
                 if ($title) {
                     $$file{title} = $title =~ s/\*/$$file{title}/r;
                 }
+                if ($cmd eq 'child') {
+                    $$file{isConnected} = 1;
+                    push @children, $file if $cmd eq 'child';
+                }
                 connectFile($file, $filters);
-                push @children, $file if $cmd eq 'child';
             }
         }
     }
@@ -869,6 +876,7 @@ sub splitFileForRefs
                 $path = '' if not defined $path;
                 $file = {
                     isRoot => 0,
+                    isConnected => 0,
                     filename => $filename,
                     id => $id,
                     anchor => $anchor,
@@ -934,11 +942,9 @@ sub addChildren
             if (exists $filesAtPath{$searchPath}) {
                 my $files = $filesAtPath{$searchPath};
                 foreach my $child (@{$files}) {
-                    if (not refInArray($child, $children)) {
-                        push @{$children}, $child;
-                        #print STDERR "Loading $$file{filename} child $$child{filename}\n";
-                        addChildren ($child, $fullPath . $ps . $$child{name}, \%isysvars);
-                    }
+                    push @{$children}, $child;
+                    #print STDERR "Loading $$file{filename} child $$child{filename}\n";
+                    addChildren ($child, $fullPath . $ps . $$child{name}, \%isysvars);
                 }
             }
             $searchPath =~ s/[^^]*\^?//; #$psr
@@ -949,11 +955,9 @@ sub addChildren
             if (exists $filesAtPartialPath{$name}) {
                 my $files = $filesAtPartialPath{$name};
                 foreach my $child (@{$files}) {
-                    if (not refInArray($child, $children)) {
-                        push @{$children}, $child;
-                        my $childFullPath = $fullPath . ($$child{id} =~ s/^[^^]+//r); #$psr
-                        addChildren ($child, $childFullPath, \%isysvars);
-                    }
+                    push @{$children}, $child;
+                    my $childFullPath = $fullPath . ($$child{id} =~ s/^[^^]+//r); #$psr
+                    addChildren ($child, $childFullPath, \%isysvars);
                 }
             }
         }
@@ -978,16 +982,6 @@ sub addChildren
         }
         $$file{children} = \@files;
     }
-}
-
-sub refInArray
-{
-    my $ref = shift;
-    my $array = shift;
-    foreach my $el (@{$array}) {
-        return 1 if $el == $ref;
-    }
-    return 0;
 }
 
 sub processTree
