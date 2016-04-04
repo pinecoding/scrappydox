@@ -1266,24 +1266,23 @@ sub proc
             # Doesn't start with path separator
             # Non-nested link
             $url = an($rawAnchor);
-            if (exists $fileForAnchor{$url}) {
-                my $title = ${$fileForAnchor{$url}}{title};
-                # To preserve case of link, only use title if more than case is different
-                if (fc $title ne fc $display) {
-                    $display = $title;
-                }
+            if ($titleSpec && exists $fileForAnchor{$url}) {
+                $title = ${$fileForAnchor{$url}}{title};
             }
         }
         my $html;
         if ($title) {
-            if ($titleSpec eq '""') {
+            if ($titleSpec eq '"') {
                 $html = "<a href=\"#$url\">$title</a>";
+            }
+            elsif ($titleSpec eq '""') {
+                $html = "<a href=\"#$url\">$display: $title</a>";
             }
             elsif ($titleSpec eq '"""') {
                 $html = "$title";
             }
-            else {
-                $html = "<a href=\"#$url\">$display: $title</a>";
+            else { # shouldn't happen
+                $html = "<a href=\"#$url\">$display</a>";
             }
         }
         else {
