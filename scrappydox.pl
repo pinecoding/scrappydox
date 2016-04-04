@@ -1116,11 +1116,11 @@ sub procLine
     # Make sure there is a body
     $body = "" if not $body;
     
-    procTableShorthand(\$body) if not $prefix;
-    
     # Process angle-bracket shorthands
     procShorthand($file, \$body) if $processShorthand;
     
+    procTableShorthand(\$body) if not $prefix;
+ 
     print $body . "\n";
 }
 
