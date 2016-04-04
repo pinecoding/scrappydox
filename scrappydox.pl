@@ -539,7 +539,6 @@ sub loadFile
     $file{anchor} = $anchor;
     $file{name} = $name;
     $file{titlePrefix} = $prefix;  
-    $file{title} = $title;
     $file{syscmds} = \@syscmds;
     $file{sysvars} = \%sysvars;
     $file{isysvars} = \%sysvars if $isRoot; # Inherited sysvars
@@ -548,6 +547,10 @@ sub loadFile
     $file{loadFromRefs} = $loadFromRefs;
     $file{refdFilesToLoad} = \@refdFilesToLoad;
     $file{splitsForRefs} = $splitsForRefs;
+    
+    # Substitute sysvars in title
+    $title =~ s/<([*])(.+?)\1>/subSysvar($1, $2, \%file)/eg;
+    $file{title} = $title;
 
     # Define first file as root
     $root = \%file if $isRoot;
@@ -1251,10 +1254,13 @@ sub proc
 
         # Logic to process titleSpec addendum
         my ($rawAnchor, $titleSpec) = splitAnchorAndTitleSpec($body);
-        my $title = ($titleSpec && exists $titleForAnchor{$rawAnchor}) ? $titleForAnchor{$rawAnchor} : '';
 
         my @pathParts = split /\^/, $rawAnchor; #$psr
         my $display = (split /\+/, $pathParts[-1])[-1] =~ s/$ss/ /gr; #$dsr
+        
+        # Title for titled-anchor includes anchor part as prefix
+        my $title = ($titleSpec && exists $titleForAnchor{$rawAnchor}) ? $display . ': ' . $titleForAnchor{$rawAnchor} : '';
+
         my $url;
         #print STDERR $char . ' ' . $display . "\n";
         if (!$pathParts[0]) {
@@ -1267,23 +1273,13 @@ sub proc
             # Non-nested link
             $url = an($rawAnchor);
             if ($titleSpec && exists $fileForAnchor{$url}) {
+                # Title for section doesn't include anchor part
                 $title = ${$fileForAnchor{$url}}{title};
             }
         }
         my $html;
         if ($title) {
-            if ($titleSpec eq '"') {
-                $html = "<a href=\"#$url\">$title</a>";
-            }
-            elsif ($titleSpec eq '""') {
-                $html = "<a href=\"#$url\">$display: $title</a>";
-            }
-            elsif ($titleSpec eq '"""') {
-                $html = "$title";
-            }
-            else { # shouldn't happen
-                $html = "<a href=\"#$url\">$display</a>";
-            }
+            $html = "<a href=\"#$url\">$title</a>";
         }
         else {
             $html = "<a href=\"#$url\">$display</a>";
@@ -1299,15 +1295,9 @@ sub proc
         }
     }
     if ($char eq '*') { # System variable
-        my $sysvarname = lc $body;
-        if ($sysvarname eq 'date') {
-            return $currDate;
-        }
-        if ($sysvarname eq 'name') {
-            return $$file{name};
-        }
+        return subSysvar($char, $body, $file);
     }
-    elsif ($char eq '+') { # User variable
+    if ($char eq '+') { # User variable
         my $uservarname = lc $body;
         my $uservars = $$file{uservars};
         if (exists $$uservars{$uservarname}) {
@@ -1324,6 +1314,21 @@ sub proc
     return "<$char$body$char>";
 }
 
+sub subSysvar
+{
+    my $char = shift;
+    my $body = shift;
+    my $file = shift;
+    my $sysvarname = lc $body;
+    if ($sysvarname eq 'date') {
+        return $currDate;
+    }
+    if ($sysvarname eq 'name') {
+        return $$file{name};
+    }
+    return "<$char$body$char>";
+}
+
 sub splitAnchorAndTitle
 {
     my $body = shift;
@@ -1336,7 +1341,7 @@ sub splitAnchorAndTitle
 sub splitAnchorAndTitleSpec
 {
     my $body = shift;
-    my ($anchor, $titleSpec) = $body =~ /^([^"]+)("{0,3})$/;
+    my ($anchor, $titleSpec) = $body =~ /^([^"]+)("{0,1})$/;
     $anchor = $body if not defined $anchor;
     $titleSpec = '' if not defined $titleSpec;
     return ($anchor, $titleSpec);
