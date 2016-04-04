@@ -1189,8 +1189,8 @@ sub proc
         if (defined $fh) {
             my $includedOutput;
             while (my $line = <$fh>) {
-                procTableShorthand(\$line);
                 procShorthand($file, \$line);
+                procTableShorthand(\$line);
                 $includedOutput .= $line;
             }
             close $fh;
