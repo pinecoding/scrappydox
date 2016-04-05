@@ -90,7 +90,7 @@ The HTML comment begin and end indicators must be flush left, and each on its ow
 
 Each "Child" command loads a file as a child section, or files as child sections (if wildcards are used). Each "Load" command loads files for caret path matching, as described for [OTHER FILES] above. In order to be included in the document, files loaded for path matching must match a file that has already been placed into the document hierarchy and that contains a "Child Match" command in its HTML comment block.
 
-"Child" and "Load" commands can include a title modifier as a subbullet that begins with a dash. For each file, the resulting section title becomes the title in the modifier plus the original title, where the original title replaces the first asterisk (if any) found in the title modifier. This is generally applied to a "Child" command for a single file, to change the title of the resulting child section. That way a file can be reused as-is in multiple documents, where the section title must be appropriate for the containing document.
+"Child" and "Load" commands can include a title modifier as a subbullet that begins with a dash. For each file, the resulting section title becomes the title in the modifier plus the original title, where the original title replaces the first vertical bar ('|') (if any) found in the title modifier. This is generally applied to a "Child" command for a single file, to change the title of the resulting child section. That way a file can be reused as-is in multiple documents, where the section title must be appropriate for the containing document.
 
 "Child" and "Load" commands can include sort modifiers as subbullets. Two are in the example above:
 
@@ -650,7 +650,7 @@ sub connectFile
             }
             foreach my $file (@files) {
                 if ($title) {
-                    $$file{title} = $title =~ s/\*/$$file{title}/r;
+                    $$file{title} = $title =~ s/\|/$$file{title}/r;
                 }
                 if ($cmd eq 'child') {
                     $$file{isConnected} = 1;
@@ -1241,7 +1241,7 @@ sub proc
         $display = '' if $char eq "'";
         if ($title) {
             if ($display) {
-                $display = $display . ': ' . $title;
+                $display = $title =~ s/\|/$display/r;
             }
             else {
                 $display = $title;
@@ -1259,7 +1259,11 @@ sub proc
         my $display = (split /\+/, $pathParts[-1])[-1] =~ s/$ss/ /gr; #$dsr
         
         # Title for titled-anchor includes anchor part as prefix
-        my $title = ($titleSpec && exists $titleForAnchor{$rawAnchor}) ? $display . ': ' . $titleForAnchor{$rawAnchor} : '';
+        my $title = '';
+        if ($titleSpec && exists $titleForAnchor{$rawAnchor}) {
+            $title = $titleForAnchor{$rawAnchor};
+            $title =~ s/\|/$display/;
+        }
 
         my $url;
         #print STDERR $char . ' ' . $display . "\n";

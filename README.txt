@@ -111,11 +111,11 @@ DESCRIPTION
     "Child" and "Load" commands can include a title modifier as a subbullet
     that begins with a dash. For each file, the resulting section title
     becomes the title in the modifier plus the original title, where the
-    original title replaces the first asterisk (if any) found in the title
-    modifier. This is generally applied to a "Child" command for a single
-    file, to change the title of the resulting child section. That way a
-    file can be reused as-is in multiple documents, where the section title
-    must be appropriate for the containing document.
+    original title replaces the first vertical bar ('|') (if any) found in
+    the title modifier. This is generally applied to a "Child" command for a
+    single file, to change the title of the resulting child section. That
+    way a file can be reused as-is in multiple documents, where the section
+    title must be appropriate for the containing document.
 
     "Child" and "Load" commands can include sort modifiers as subbullets.
     Two are in the example above:
