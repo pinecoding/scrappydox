@@ -3,7 +3,7 @@
 # 
 # sdsstable.sh - runs sdsstable.ps1 PowerShell script
 # 
-# Copyright (c) 2015 Sam Gabriel
+# Copyright (c) 2016 Sam Gabriel
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the
@@ -26,7 +26,7 @@
 #
 
 syntax () {
-    echo "$0 file [sheet] [class] [-sort]" 1>&2
+    echo "$0 file [sheet] [class] [--markup] [--sort]" 1>&2
     exit 1
 }
 
@@ -42,6 +42,9 @@ for arg in "$@"; do
     case $arg in
         -s|--sort)
             sort="-sort"
+            ;;
+        -m|--markup)
+            markup="-markup"
             ;;
         *)
             case $position in
@@ -74,4 +77,4 @@ wfile="`cygpath -w $file`"
 #echo "class: $class" 1>&2
 #echo "sort: $sort" 1>&2
 #exit 1
-powershell -NoProfile -ExecutionPolicy Bypass -file "$wpsfile" "$wfile" "$sheet" "$class" "$sort" 
+powershell -NoProfile -ExecutionPolicy Bypass -file "$wpsfile" "$wfile" "$sheet" "$class" "$markup" "$sort" 

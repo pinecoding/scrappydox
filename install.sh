@@ -7,7 +7,7 @@
 #
 #   build.sh installs to /usr/local/bin/sdpd
 # 
-# Copyright (c) 2015 Sam Gabriel
+# Copyright (c) 2016 Sam Gabriel
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the

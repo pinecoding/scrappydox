@@ -3,7 +3,7 @@
 # 
 # sdssclean.sh - runs sdssclean.ps1 PowerShell script
 # 
-# Copyright (c) 2015 Sam Gabriel
+# Copyright (c) 2016 Sam Gabriel
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the

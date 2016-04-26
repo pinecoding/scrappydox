@@ -1,5 +1,5 @@
 <#
-Copyright (c) 2015 Sam Gabriel
+Copyright (c) 2016 Sam Gabriel
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -12,12 +12,13 @@ Param(
   [string]$file = '',
   [int]$sheet = 1,
   [string]$class = '',
+  [switch]$markup,
   [switch]$sort
 )
 
 if ($file -eq '') {
     $cmdname = $MyInvocation.MyCommand.Name
-    Write-Host "$cmdname file [class] [sheet]"
+    Write-Host "$cmdname file [sheet] [class] [markup] [sort]"
     Exit 1
 }
 
@@ -41,7 +42,10 @@ $colLast = $colFirst + $colCount - 1
 $rowCount = $usedRange.Rows.Count
 $rowFirst = $usedRange.Row
 $rowLast = $rowFirst + $rowCount - 1
-if ($class) {
+if ($markup) {
+    Write-Host "|="
+}
+elseif ($class) {
     Write-Host "<table class=`"$class`">"
 }
 else {
@@ -52,6 +56,9 @@ for ($row = $rowFirst; $row -le $rowLast; $row++) {
     $type = 'td'
     if ($row -eq $rowFirst) {
         $type = 'th'
+    }
+    elseif ($markup) {
+        Write-Host "|-"
     }
     [int]$outcol = 0
     for ($col = $colFirst; $col -le $colLast; $col++) {
@@ -70,7 +77,15 @@ for ($row = $rowFirst; $row -le $rowLast; $row++) {
         }
         $content = $item.Text
         $line += '<' + $type + $style + '>'
-        if (($row -eq $rowFirst) -and $sort) {
+        if ($markup) {
+            if ($row -eq $rowFirst) {
+                Write-Host "|# $content"
+            }
+            else {
+                Write-Host "|| $content"
+            }
+        }
+        elseif (($row -eq $rowFirst) -and $sort) {
             $line += '<button href="" onclick="' + "sort(this.parentNode.parentNode.parentNode.parentNode," +  $outcol + ")" + '">'
             $line += $content
             $line += "</button>" 
@@ -82,9 +97,17 @@ for ($row = $rowFirst; $row -le $rowLast; $row++) {
         $outcol++
     }
     $line += '</tr>'
-    Write-Host $line
+    if (-not $markup) {
+        Write-Host $line
+    }
 }
-Write-Host '</table>'
+if ($markup) {
+    Write-Host "|_"
+}
+else {
+    Write-Host '</table>'
+}
+
 $workbook.Close()
 $excel.Quit()
 $rv = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel);
