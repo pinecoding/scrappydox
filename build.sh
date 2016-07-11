@@ -31,12 +31,18 @@ else
     files=(*.txt)
 fi
 rootfile=${files[0]}
+noextname=`echo $rootfile | sed -e 's/[.][^.]*$//'`
 basename=`echo $rootfile | sed -e 's/^.*[+]//' -e 's/~.*$//' -e 's/[.][^.]*$//'`
 title=${basename//_/ }
 #echo "${files[@]}"
 #echo "$basename"
 #exit
+if [ -e "$noextname.head" ]; then
+    head="--include-in-header=$noextname.head"
+else
+    head=""
+fi
 perl scrappydox.pl "${files[@]}" >$basename.md
-pandoc --standalone --self-contained \
+pandoc --standalone --self-contained $head \
     --title-prefix="$title" \
     $basename.md >$basename.html
