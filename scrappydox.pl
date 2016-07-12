@@ -1128,13 +1128,15 @@ sub procLine
     # Process angle-bracket shorthands
     procShorthand($file, \$body) if $processShorthand;
     
-    procTableShorthand(\$body, $colNum, $columns) if not $prefix;
+    procTableShorthand($$file{filename}, $lineNumber, \$body, $colNum, $columns) if not $prefix;
  
     print $body . "\n";
 }
 
 sub procTableShorthand
 {
+    my $fromFilename = shift;
+    my $fromLinenum = shift;
     my $bodyref = shift;
     my $colNum = shift;
     my $columns = shift;
@@ -1162,11 +1164,12 @@ sub procTableShorthand
         my $bodystr = '';
         my $rowcount = 0;
         foreach my $filename (glob $1) {
-            next if not exists $fileForFilename{$filename};
+            #next if not exists $fileForFilename{$filename};
             #print STDERR "Processing $filename\n";
             if ($rowcount > 0) {
                 $bodystr .= "\n</tr><tr>\n";
             }
+            loadFile($fromFilename, $fromLinenum, $filename, {}, {}, {}, {});
             my $file = $fileForFilename{$filename};
             my $uservars = $$file{uservars};
             foreach my $col (@{$columns}) {
@@ -1257,9 +1260,10 @@ sub proc
             my $includedOutput;
             my $colNum = 0;
             my @columns;
+            my $lineNumber = 0;
             while (my $line = <$fh>) {
                 procShorthand($file, \$line);
-                procTableShorthand(\$line, \$colNum, \@columns);
+                procTableShorthand($body, ++$lineNumber, \$line, \$colNum, \@columns);
                 $includedOutput .= $line;
             }
             close $fh;
