@@ -31,8 +31,7 @@
 
 cp scrappydox.pl /usr/local/bin/scrappydox
 chmod +x /usr/local/bin/scrappydox
-cp build.sh /usr/local/bin/sdpd
-sed -i '/perl scrappydox.pl/s/perl scrappydox.pl/scrappydox/' /usr/local/bin/sdpd
+sed '/perl scrappydox.pl/s/perl scrappydox.pl/scrappydox/' build.sh >/usr/local/bin/sdpd
 chmod +x /usr/local/bin/sdpd
 cp sdssclean.ps1 /usr/local/bin/
 cp sdssclean.sh /usr/local/bin/sdssclean
