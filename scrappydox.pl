@@ -288,6 +288,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 use strict;
 use warnings;
 use feature "fc";
+use Storable 'dclone';
 
 if (@ARGV == 0) {
     print STDERR "scrappydox file...\n";
@@ -433,7 +434,8 @@ sub loadFile
     my $title;
     my @syscmds;
     my %sysvars;
-    my $uservars = $isRoot ? $parentUservars : {%$parentUservars};
+    #my $uservars = $isRoot ? $parentUservars : {%$parentUservars};
+    my $uservars = $isRoot ? $parentUservars : dclone $parentUservars;
     open (my $fh, '<', $filename) or die "$errormsg: file open error: $!\n";
     
     # Obtain information from first line of file
@@ -1056,16 +1058,18 @@ sub processFile
 
     # Process file contents
     my $ignoringProperties = 0;
+    my $colNum = 0;
+    my @columns;
     if (exists $$file{lines}) {
         my $lineNumber = 0;
         foreach my $line (@{$$file{lines}}) {
-            procLine($file, $line, ++$lineNumber, $prefixAdjustment, $processShorthand, \$ignoringProperties);
+            procLine($file, $line, ++$lineNumber, $prefixAdjustment, $processShorthand, \$ignoringProperties, \$colNum, \@columns);
         }
     }
     else {
         open (my $fh, '<', $filename) or die "Can't open $filename: $!\n";
         while (<$fh>) {
-            procLine($file, $_, $., $prefixAdjustment, $processShorthand, \$ignoringProperties);
+            procLine($file, $_, $., $prefixAdjustment, $processShorthand, \$ignoringProperties, \$colNum, \@columns);
         }
         close $fh;
     }
@@ -1083,6 +1087,8 @@ sub procLine
     my $prefixAdjustment = shift;
     my $processShorthand = shift;
     my $ignoringProperties = shift;
+    my $colNum = shift;
+    my $columns = shift;
     my $anchor = $$file{anchor};
     my $titlePrefix = $$file{titlePrefix};
     my $title = $$file{title};
@@ -1122,34 +1128,71 @@ sub procLine
     # Process angle-bracket shorthands
     procShorthand($file, \$body) if $processShorthand;
     
-    procTableShorthand(\$body) if not $prefix;
+    procTableShorthand($$file{filename}, $lineNumber, \$body, $colNum, $columns) if not $prefix;
  
     print $body . "\n";
 }
 
 sub procTableShorthand
 {
+    my $fromFilename = shift;
+    my $fromLinenum = shift;
     my $bodyref = shift;
+    my $colNum = shift;
+    my $columns = shift;
     my $firstChar = substr($$bodyref, 0, 1);
     return if $firstChar ne '|';
-    my ($secondChar) = $$bodyref =~ /^\|(\S)\s*$/;
-    if (defined $secondChar) {
-        if ($secondChar eq '=') {
-            $$bodyref = '<table><tr>';
-            return;
-        }
-        if ($secondChar eq '-') {
-            $$bodyref = '</tr><tr>';
-            return;
-        }
-        if ($secondChar eq '_') {
-            $$bodyref = '</tr></table>';
-            return;
-        }
+    if ($$bodyref =~ /^\|=\s*$/) {
+        $$bodyref = '<table><tr>';
+        $$colNum = 0;
+        @{$columns} = ();
+        return;
     }
-    if ($$bodyref =~ /^\|([^#>|]*)([#>|])/) {
+    if ($$bodyref =~ /^\|-\s*$/) {
+        $$bodyref = '</tr><tr>';
+        $$colNum = 0;
+        return;
+    }
+    if ($$bodyref =~ /^\|_\s*$/) {
+        $$bodyref = '</tr></table>';
+        @{$columns} = ();
+        $$colNum = 0;
+        return;
+    }
+    if ($$bodyref =~ /^\|@\s*(\S.*?)\s*$/) {
+        #print STDERR "Table rows from $1\n";
+        my $bodystr = '';
+        my $rowcount = 0;
+        foreach my $filename (glob $1) {
+            #next if not exists $fileForFilename{$filename};
+            #print STDERR "Processing $filename\n";
+            if ($rowcount > 0) {
+                $bodystr .= "\n</tr><tr>\n";
+            }
+            loadFile($fromFilename, $fromLinenum, $filename, {}, {}, {}, {});
+            my $file = $fileForFilename{$filename};
+            my $uservars = $$file{uservars};
+            foreach my $col (@{$columns}) {
+                #print STDERR "Processing column $col\n";
+                if (exists $$uservars{$col}) {
+                    my $userval = $$uservars{$col}[-1];
+                    procShorthand($file, \$userval);
+                    $bodystr .= "<td>$userval</td>";
+                }
+                else {
+                    $bodystr .= '<td></td>';
+                }
+            }
+            ++$rowcount;
+        }
+        $$bodyref = $bodystr;
+        $$colNum = 0;
+        return;
+    }
+    if ($$bodyref =~ /^\|([^#\$>|]*)([#\$>|])\s*(.*?)\s*$/) {
         my $styleChars = defined $1 ? $1 : '';
         my $type = $2;
+        my $content = defined $3 ? $3 : '';
         my $styles;
         for my $i (0..length($styleChars)-1) {
             my $styleChar = substr($styleChars, $i, 1);
@@ -1160,10 +1203,34 @@ sub procTableShorthand
             }
         }
         my $styleString = $styles ? " style=\"$styles\"" : '';
-        my $tag = $type eq '#' ? 'th' : 'td';
-        my $startTag = "<$tag$styleString>";
-        my $endTag = $type eq '>' ? '' : "</$tag>";
-        $$bodyref =~ s/^\|[^#>|]*[#>|](.*)$/$startTag$1$endTag/;
+        my $tag;
+        my $startTag;
+        my $endTag;
+        if ($type eq '#') {
+            push @{$columns}, lc($content);
+            $tag = 'th';
+            $startTag = "<$tag$styleString>";
+            $endTag = "</$tag>";
+        }
+        elsif ($type eq '$') {
+            my $colNumber = @{$columns};
+            push @{$columns}, lc($content);
+            $tag = 'th';
+            $startTag = "<$tag$styleString>" . '<button href="" onclick="' . "sort(this.parentNode.parentNode.parentNode.parentNode, $colNumber)" . '">';
+            $endTag = "</button>" . "</$tag>";
+        }
+        elsif ($type eq '>') {
+            $tag = 'td';
+            $startTag = "<$tag$styleString>";
+            $endTag = '';
+        }
+        else {
+            $tag = 'td';
+            $startTag = "<$tag$styleString>";
+            $endTag = "</$tag>";
+        }
+        $$bodyref =~ s/^\|[^#\$>|]*[#\$>|](.*)$/$startTag$1$endTag/;
+        $$colNum += 1;
         return;
     }
 }
@@ -1191,9 +1258,12 @@ sub proc
         open (my $fh, '<', $body) or die "Can't open $body: $!\n";
         if (defined $fh) {
             my $includedOutput;
+            my $colNum = 0;
+            my @columns;
+            my $lineNumber = 0;
             while (my $line = <$fh>) {
                 procShorthand($file, \$line);
-                procTableShorthand(\$line);
+                procTableShorthand($body, ++$lineNumber, \$line, \$colNum, \@columns);
                 $includedOutput .= $line;
             }
             close $fh;
