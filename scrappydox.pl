@@ -288,7 +288,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 use strict;
 use warnings;
 use feature "fc";
-use Storable 'dclone';
+#use Storable 'dclone';
 
 if (@ARGV == 0) {
     print STDERR "scrappydox file...\n";
@@ -435,7 +435,8 @@ sub loadFile
     my @syscmds;
     my %sysvars;
     #my $uservars = $isRoot ? $parentUservars : {%$parentUservars};
-    my $uservars = $isRoot ? $parentUservars : dclone $parentUservars;
+    #my $uservars = $isRoot ? $parentUservars : dclone $parentUservars;
+	my $uservars = $isRoot ? $parentUservars : cloneArrayHash($parentUservars);
     open (my $fh, '<', $filename) or die "$errormsg: file open error: $!\n";
     
     # Obtain information from first line of file
@@ -669,7 +670,7 @@ sub connectFile
         #print STDERR "Loading $refdFile\n";
         my $refdFile = $$refdFileInfo{refFilename};
         my $lcRefdFile = lc($refdFile);
-        my $file = exists $$splitsForRefs{$lcRefdFile} ? $$splitsForRefs{$lcRefdFile} : loadFile($$refdFileInfo{fromFilename}, $$refdFileInfo{fromLinenum}, $refdFile, $filters, $loadFromRefs, $splitsForRefs, $uservars);
+        my $file = exists $$splitsForRefs{$lcRefdFile} ? $$splitsForRefs{$lcRefdFile} : loadFile($$refdFileInfo{fromFilename}, $$refdFileInfo{fromLinenum}, $refdFile, $filters, $loadFromRefs, $splitsForRefs, {});
         connectFile($file, $filters) if defined $file;
     }
 }
@@ -1432,6 +1433,17 @@ sub addToHash
     else {
         $$hash{$key} = [$value];
     }
+}
+
+sub cloneArrayHash
+{
+    my $in = shift;
+	my %out;
+	foreach my $key (keys %$in) {
+		my @a = @{$$in{$key}};
+		$out{$key} = \@a;
+	}
+	return \%out;
 }
 
 # This subroutine is a safer alternative to an eval statement
