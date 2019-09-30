@@ -12,6 +12,9 @@ import codecs
 #     assoc .pyw=pythonw
 #     ftype pythonw=C:\Users\Sam\ActivePython36\pythonw.exe "%1" %*
 
+# Placing in https://github.com/pinecoding/scrappydox.git repo
+# git clone -c core.autocrlf=false -c core.longpaths=true https://github.com/pinecoding/scrappydox.git
+# checked in to username "Sam Gabriel", email "pinecoding@gmail.com"
 
 class Person:
     def __init__(self, initialProperties=None, body=None):
