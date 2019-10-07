@@ -1,3 +1,4 @@
+import utilities
 import argparse
 import os
 import tkinter as tk
@@ -55,13 +56,32 @@ class Person:
             print(self.markdown())
         else:
             self.display()
-        
+       
+    def substitutedBody(self):
+        return self.fstr(self.body)
+
     def markdown(self):
-        return f"""\
+        output = f"""\
 ## {self.__props["Name"]}
 
-{self.fstr(self.body)}
+{self.substitutedBody()}
 """
+        if "Children" in self.__props:
+            output += f"""
+### Children
+"""
+            for child in self.__props["Children"]:
+                childFile = utilities.findPywFilenameHere(child["file"])
+                if childFile is not None:
+                    childGlobals = {}
+                    exec(open(childFile).read(), childGlobals)
+                    childObject = childGlobals["this"]
+                    output += f"""
+#### {childObject.properties["Name"]}
+
+{childObject.substitutedBody()}
+"""   
+        return output
 
     def html(self):
         return markdown.markdown(self.markdown(), ["extra"])
@@ -104,28 +124,35 @@ class Person:
         
         if "Mother" in self.__props:
             def openMother():
-                subprocess.Popen(["pythonw", self.__props["Mother"]])
+                motherFile = utilities.findPywFilenameHere(self.__props["Mother"])
+                if motherFile is not None:
+                    subprocess.Popen(["pythonw", motherFile])
             mother = tk.Button(buttons, text="Mother", command=openMother)
             mother.pack(anchor="w")
 
         if "Father" in self.__props:
             def openFather():
-                subprocess.Popen(["pythonw", self.__props["Father"]])
-                # webbrowser.open_new_tab("test.html") # works
+                fatherFile = utilities.findPywFilenameHere(self.__props["Father"])
+                if fatherFile is not None:
+                    subprocess.Popen(["pythonw", fatherFile])
             father = tk.Button(buttons, text="Father", command=openFather)
             father.pack(anchor="w")
 
         if "Siblings" in self.__props:
             def openSiblings():
                 for sibling in self.__props["Siblings"]:
-                    subprocess.Popen(["pythonw", sibling["file"]])
+                    siblingFile = utilities.findPywFilenameHere(sibling["file"])
+                    if siblingFile is not None:
+                        subprocess.Popen(["pythonw", siblingFile])
             siblings = tk.Button(buttons, text="Siblings", command=openSiblings)
             siblings.pack(anchor="w")
 
         if "Children" in self.__props:
             def openChildren():
                 for child in self.__props["Children"]:
-                    subprocess.Popen(["pythonw", child["file"]])
+                    childFile = utilities.findPywFilenameHere(child["file"])
+                    if childFile is not None:
+                        subprocess.Popen(["pythonw", childFile])
             children = tk.Button(buttons, text="Children", command=openChildren)
             children.pack(anchor="w")
 
