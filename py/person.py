@@ -33,7 +33,7 @@ class Person:
     @yaml.setter
     def yaml(self, yaml):
         self.__yaml = yaml
-        self.__props = yamlModule.load(yaml)
+        self.__props = yamlModule.load(yaml, Loader=yamlModule.FullLoader)
 
     @property
     def properties(self):
@@ -84,7 +84,7 @@ class Person:
         return output
 
     def html(self):
-        return markdown.markdown(self.markdown(), ["extra"])
+        return markdown.markdown(self.markdown(), extensions=["extra"])
         
     def display(self):
         root = tk.Tk()
@@ -160,6 +160,7 @@ class Person:
             filename = self.filenameBase + ".html"
             file = codecs.open(filename, "w", encoding="utf-8", errors="xmlcharrefreplace")
             file.write(self.html())
+            file.close()
             webbrowser.open_new_tab(filename)
         htmlButton = tk.Button(buttons, text="HTML", command=genHtml)
         htmlButton.pack(anchor="w")
